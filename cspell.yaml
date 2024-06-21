@@ -1,0 +1,26 @@
+version: "0.2"
+language: en
+allowCompoundWords: true
+dictionaries:
+  - node
+  - typescript
+  - python
+words:
+  - openapi
+ignorePaths:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/dist-dev/**"
+  - "**/.docusaurus/**"
+  - "**/CHANGELOG.md"
+  - packages/website/build/**
+  - common/scripts/*
+patterns:
+  - name: cursortest
+    pattern: /(.*)┆(.*)/g
+  - name: Authorization_Basic
+    description: Ignore Base64 authorization tokens
+    pattern: "/Authorization: Basic\\s+\\S+/g"
+ignoreRegExpList:
+  - cursortest
+  - Authorization_Basic
