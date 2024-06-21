@@ -1,25 +1,17 @@
 {
   "compilerOptions": {
-    "composite": true,
-    "alwaysStrict": true,
-    "forceConsistentCasingInFileNames": true,
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "esModuleInterop": false,
-    "noImplicitAny": true,
-    "noImplicitReturns": true,
-    "noImplicitThis": true,
-    "sourceMap": true,
-    "declarationMap": true,
-    "strict": true,
-    "declaration": true,
-    "stripInternal": true,
-    "noEmitHelpers": false,
-    "target": "es2019",
-    "lib": ["es2019"],
-    "experimentalDecorators": true,
-    "skipLibCheck": true, // Issue with Node16 module resolution for now.
-    "newLine": "LF",
-    "outDir": "./dist"
-  }
+    "target": "ESNext" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
+    "module": "NodeNext" /* Specify what module code is generated. */,
+    "rootDir": "./" /* Specify the root folder within your source files. */,
+    "moduleResolution": "NodeNext" /* Specify how TypeScript looks up a file from a given module specifier. */,
+    "declaration": true /* Generate .d.ts files from TypeScript and JavaScript files in your project. */,
+    "declarationMap": true /* Create sourcemaps for d.ts files. */,
+    "sourceMap": true /* Create source map files for emitted JavaScript files. */,
+    "outDir": "./dist" /* Specify an output folder for all emitted files. */,
+    "esModuleInterop": true /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */,
+    "forceConsistentCasingInFileNames": true /* Ensure that casing is correct in imports. */,
+    "strict": true /* Enable all strict type-checking options. */,
+    "skipLibCheck": true /* Skip type checking all .d.ts files. */
+  },
+  "include": ["./src/**/*.ts"]
 }
