@@ -1,3 +1,5 @@
+import diff from "deep-diff";
+import { DefinitionMetadata } from "./definitions.js";
 import * as fs from "fs";
 
 async function loadJsonFile(path: string): Promise<any> {
@@ -41,9 +43,16 @@ async function main(args: string[]) {
 
   const raw1 = await loadJsonContents(in1);
   const raw2 = await loadJsonContents(in2);
-  const exp1 = expandSwagger(raw1);
-  const exp2 = expandSwagger(raw2);
-  // TODO: Now diff them
+  const lhs = expandSwagger(raw1);
+  const rhs = expandSwagger(raw2);
+
+  // diff the output
+  const differences = diff(lhs, rhs);
+  if (!differences) {
+    console.log("No differences found");
+  } else {
+    console.log(JSON.stringify(differences, null, 2));
+  }
 }
 
 /**
@@ -54,39 +63,101 @@ async function main(args: string[]) {
  */
 function expandSwagger(swaggerMap: Map<string, any>): any {
   let result: any = {};
-  // gather all of the defintions which we will use to resolve references
-  const definitions = new Map<string, Map<string, any>>();
+  let unresolvedReferences = new Set<string>();
+
+  // TODO: Need to ingest examples and common types
+
+  // Gather all of the defintions which we will use to resolve references.
+  const definitions = new Map<string, DefinitionMetadata>();
   for (const [filename, data] of swaggerMap.entries()) {
-    if (data.definitions) {
-      definitions.set(filename, data.definitions);
+    const defs = data.definitions ?? {};
+    for (const [name, value] of Object.entries(defs)) {
+      definitions.set(name, {
+        name,
+        value: visit(value),
+        original: value,
+        source: filename,
+      });
+    }
+  }
+
+  unresolvedReferences.clear();
+  for (const [name, value] of definitions.entries()) {
+    const expanded = visit(value.value);
+    definitions.set(name, { ...value, value: expanded });
+  }
+
+  function isReference(value: any): boolean {
+    return Object.keys(value).includes("$ref");
+  }
+
+  function parseReference(
+    ref: string
+  ): { name: string; path?: string } | undefined {
+    const regex = /(.+\.json)?#\/definitions\/(.+)/;
+    const match = ref.match(regex);
+    if (!match) {
+      return undefined;
+    }
+    return {
+      path: match[1],
+      name: match[2],
+    };
+  }
+
+  function handleReference(ref: string): any | undefined {
+    const refResult = parseReference(ref);
+    if (!refResult) {
+      unresolvedReferences.add(ref);
+      return {
+        $ref: ref,
+      };
+    }
+    const match = definitions.get(refResult.name);
+    if (match) {
+      return match.value;
+    } else {
+      // keep a reference so we can resolve on a subsequent pass
+      unresolvedReferences.add(refResult.name);
+      return {
+        $ref: ref,
+      };
+    }
+  }
+
+  function visitArray(value: any[]): any {
+    // visit array objects but not arrays of primitives
+    if (value.length > 0 && typeof value[0] === "object") {
+      return value.map((v) => visitObject(v));
+    } else {
+      return value;
+    }
+  }
+
+  function visitObject(value: any): any {
+    if (!isReference(value)) {
+      return visit(value);
+    } else {
+      // get the value of the $ref key
+      const ref = (value as any)["$ref"];
+      return handleReference(ref);
     }
   }
 
   function visit(obj: any): any {
     let result: any = {};
     for (const [key, value] of Object.entries(obj)) {
-      if (key === "produces") {
-        let test = "best";
+      // skip definitions since we process them separately
+      if (key === "definitions") {
+        continue;
       }
       if (value === null) {
         throw new Error("Unexpected null value found");
       } else if (Array.isArray(value)) {
-        // visit array objects but not arrays of primitives
-        if (value.length > 0 && typeof value[0] === "object") {
-          result[key] = value.map((v) => visit(v));
-        } else {
-          result[key] = value;
-        }
+        result[key] = visitArray(value);
       } else if (typeof value === "object") {
-        const objectKeys = Object.keys(value);
-        if (objectKeys.includes("$ref")) {
-          // TODO: Handle ref
-          result[key] = value;
-        } else {
-          result[key] = visit(value);
-        }
+        result[key] = visitObject(value);
       } else {
-        // primitives and literals
         result[key] = value;
       }
     }
@@ -98,6 +169,9 @@ function expandSwagger(swaggerMap: Map<string, any>): any {
   for (const [filename, data] of swaggerMap.entries()) {
     result = visit(data);
   }
+  console.warn(
+    `Unresolved references: ${Array.from(unresolvedReferences).join(", ")}`
+  );
   return result;
 }
 
