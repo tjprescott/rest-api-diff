@@ -1,6 +1,9 @@
-import diff from "deep-diff";
+import { Diff, diff } from "deep-diff";
 import { DefinitionMetadata } from "./definitions.js";
 import * as fs from "fs";
+import { RuleResult, RuleSignature } from "./rules/rules.js";
+
+const rules: RuleSignature[] = [];
 
 async function loadJsonFile(path: string): Promise<any> {
   const fileContent = fs.readFileSync(path, "utf-8");
@@ -14,8 +17,17 @@ async function loadJsonContents(path: string): Promise<Map<string, any>> {
 
   const pathsToLoad = stats.isDirectory() ? fs.readdirSync(path) : [path];
   for (const filepath of pathsToLoad) {
+    const filePathStats = fs.statSync(`${path}/${filepath}`);
+    // Ignore director for now
+    if (filePathStats.isDirectory()) {
+      continue;
+    }
     const name = path.split("/").pop()!.split(".")[0];
-    jsonContents.set(name, await loadJsonFile(`${path}/${filepath}`));
+    console.log(`Loading ${path}/${filepath}`);
+    // skip non-JSON files
+    if (filepath.endsWith(".json")) {
+      jsonContents.set(name, await loadJsonFile(`${path}/${filepath}`));
+    }
   }
   return jsonContents;
 }
@@ -31,8 +43,8 @@ function validatePath(path: string): boolean {
 
 async function main(args: string[]) {
   // TODO: Eliminate defaults
-  const in1 = args[2] ?? "A";
-  const in2 = args[3] ?? "B";
+  const in1 = args[2] ?? "KeyVaultOriginal";
+  const in2 = args[3] ?? "KeyVaultGenerated";
 
   // Ensure that input1 and input2 are provided
   if (!in1 || !in2) {
@@ -48,10 +60,16 @@ async function main(args: string[]) {
 
   // diff the output
   const differences = diff(lhs, rhs);
+
+  processDiff(differences);
+
   if (!differences) {
     console.log("No differences found");
   } else {
     console.log(JSON.stringify(differences, null, 2));
+    console.warn(`Found ${differences.length} differences!`);
+    // dump the differences to a file
+    fs.writeFileSync("diff.json", JSON.stringify(differences, null, 2));
   }
 }
 
@@ -173,6 +191,26 @@ function expandSwagger(swaggerMap: Map<string, any>): any {
     `Unresolved references: ${Array.from(unresolvedReferences).join(", ")}`
   );
   return result;
+}
+
+function processDiff(differences: Diff<any, any>[] | undefined) {
+  if (!differences) {
+    return;
+  }
+  for (const data of differences) {
+    for (const rule of rules) {
+      const result = rule(data);
+      switch (result) {
+        case RuleResult.Violation:
+          break;
+        case RuleResult.ContinueProcessing:
+          break;
+        case RuleResult.Okay:
+          console.log(`Rule passed: ${rule.name}`);
+          break;
+      }
+    }
+  }
 }
 
 await main(process.argv);
