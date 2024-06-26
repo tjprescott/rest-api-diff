@@ -1,5 +1,5 @@
 import { DiffEdit, DiffDeleted, DiffNew, DiffArray } from "deep-diff";
-import { RuleResult } from "./rules.js";
+import { DiffRuleResult } from "./rules.js";
 
 /**
  * Ignores differences in any "description" properties.
@@ -12,13 +12,13 @@ export function ignoreDescriptionRule(
     | DiffDeleted<any>
     | DiffNew<any>
     | DiffArray<any, any>
-): RuleResult {
+): DiffRuleResult {
   if (data.path?.length === 0) {
-    return RuleResult.ContinueProcessing;
+    return DiffRuleResult.ContinueProcessing;
   }
   const lastPath = data.path!.slice(-1)[0];
   if (lastPath === "description") {
-    return RuleResult.Okay;
+    return DiffRuleResult.Okay;
   }
-  return RuleResult.ContinueProcessing;
+  return DiffRuleResult.ContinueProcessing;
 }

@@ -1,5 +1,5 @@
 import { DiffEdit, DiffDeleted, DiffNew, DiffArray } from "deep-diff";
-import { RuleResult } from "./rules.js";
+import { DiffRuleResult } from "./rules.js";
 
 const pathsToIgnore = [
   "info.title",
@@ -26,17 +26,17 @@ export function ignoredPropertiesRule(
     | DiffDeleted<any>
     | DiffNew<any>
     | DiffArray<any, any>
-): RuleResult {
+): DiffRuleResult {
   if (data.kind === "E" || data.kind === "N" || data.kind === "D") {
     const path = data.path?.join(".");
     if (!path) {
-      return RuleResult.ContinueProcessing;
+      return DiffRuleResult.ContinueProcessing;
     }
     for (const pti of pathsToIgnore) {
       if (path.startsWith(pti)) {
-        return RuleResult.Okay;
+        return DiffRuleResult.Okay;
       }
     }
   }
-  return RuleResult.ContinueProcessing;
+  return DiffRuleResult.ContinueProcessing;
 }

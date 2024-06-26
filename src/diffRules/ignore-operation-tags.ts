@@ -1,5 +1,5 @@
 import { DiffEdit, DiffDeleted, DiffNew, DiffArray } from "deep-diff";
-import { RuleResult } from "./rules.js";
+import { DiffRuleResult } from "./rules.js";
 
 /**
  * Ignores any OpenAPI tags set on operations. This does not ignore
@@ -13,14 +13,14 @@ export function ignoreOperationTagsRule(
     | DiffDeleted<any>
     | DiffNew<any>
     | DiffArray<any, any>
-): RuleResult {
+): DiffRuleResult {
   if (data.path?.length !== 4) {
-    return RuleResult.ContinueProcessing;
+    return DiffRuleResult.ContinueProcessing;
   }
   const lastPath = data.path!.slice(-1)[0];
   const firstPath = data.path![0];
   if (lastPath === "tags" && firstPath === "paths") {
-    return RuleResult.Okay;
+    return DiffRuleResult.Okay;
   }
-  return RuleResult.ContinueProcessing;
+  return DiffRuleResult.ContinueProcessing;
 }
