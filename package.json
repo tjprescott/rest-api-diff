@@ -17,6 +17,7 @@
   "license": "MIT",
   "main": "dist/src/index.js",
   "devDependencies": {
+    "openapi-types": "^1.0.0",
     "@types/node": "^20.14.7",
     "@types/deep-diff": "^1.0.5",
     "rimraf": "^5.0.7",

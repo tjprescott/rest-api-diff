@@ -38,12 +38,7 @@ export class DefinitionRegistry {
         if (this.definitions.has(name)) {
           throw new Error(`Duplicate definition: ${name}`);
         }
-        this.definitions.set(name, {
-          name,
-          value: this.parser.parse(path, value),
-          original: value,
-          source: filename,
-        });
+        this.definitions.set(name, this.parser.parse(path, value));
       }
       // Gather parameter definitions
       for (const [name, value] of Object.entries(data.parameters ?? {})) {
@@ -80,8 +75,8 @@ export class DefinitionRegistry {
     this.resetUnresolvedReferences();
     for (const [name, value] of this.definitions.entries()) {
       const path = new SwaggerPath(name, PathKind.DefinitionKey);
-      const expanded = this.parser.parse(path, value.value);
-      this.definitions.set(name, { ...value, value: expanded });
+      const expanded = this.parser.parse(path, value);
+      this.definitions.set(name, expanded);
     }
     for (const [name, value] of this.parameters.entries()) {
       const path = new SwaggerPath(name, PathKind.DefinitionKey);

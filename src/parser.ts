@@ -1,3 +1,4 @@
+import { OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
 import { ParameterizedHost } from "./extensions/parameterized-host.js";
 import { PathKind, SwaggerPath } from "./paths.js";
@@ -18,12 +19,15 @@ export class SwaggerParser {
   private definitions: DefinitionRegistry;
   private options?: SwaggerParserOptions;
   private parameterizedHost?: ParameterizedHost;
+  private host?: string;
   private result = {};
+  private initialized: boolean = false;
 
   constructor(map: Map<string, any>, options?: SwaggerParserOptions) {
     this.options = options;
     this.definitions = new DefinitionRegistry(map, this);
     this.definitions.initialize();
+    this.initialized = true;
     for (const [_, data] of map.entries()) {
       this.result = { ...this.result, ...this.parseRoot(data) };
     }
@@ -40,26 +44,17 @@ export class SwaggerParser {
 
   /** Parse a generic node. */
   parse(path: SwaggerPath, obj: any): any {
-    if (!obj) {
-      throw new Error(`Object is null at path: ${path.fullPath()}`);
+    if (obj === undefined || obj === null) {
+      throw new Error(`Object is ${obj} at path: ${path.fullPath()}`);
     }
-    let result: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
-      console.log(`Generic parse: ${childPath.fullPath()}`);
-      if (Array.isArray(value)) {
-        result[key] = this.parseArray(path, value);
-      } else if (typeof value === "object") {
-        const val = this.parseObject(path, value);
-        if (!val) {
-          throw new Error(`Visit returned null.`);
-        }
-        result[key] = val;
-      } else {
-        result[key] = value;
-      }
+    // base case for primitive types
+    if (typeof obj !== "object") {
+      return obj;
+    } else if (Array.isArray(obj)) {
+      return this.parseArray(path, obj);
+    } else if (typeof obj === "object") {
+      return this.parseObject(path, obj);
     }
-    return result;
   }
 
   /** Special handling for the root of a Swagger object. */
@@ -69,6 +64,8 @@ export class SwaggerParser {
     // Retrieve any parameterized host information before parsing
     this.parameterizedHost = obj["x-ms-parameterized-host"];
     delete obj["x-ms-parameterized-host"];
+    this.host = obj["host"];
+    delete obj["host"];
 
     for (const [key, val] of Object.entries(obj)) {
       const path = new SwaggerPath(key, PathKind.SwaggerProperty);
@@ -90,6 +87,9 @@ export class SwaggerParser {
         case "securityDefinitions":
         case "tags":
         case "externalDocs":
+          if (key === "consumes") {
+            let test = "best";
+          }
           result[key] = this.parse(path, val);
           break;
         case "paths":
@@ -102,9 +102,94 @@ export class SwaggerParser {
     return result;
   }
 
+  /** Parse a response object. */
+  #parseResponse(path: SwaggerPath, value: any): any {
+    let result: any = {};
+    const sortedEntries = Object.entries(value).sort();
+    for (const [key, val] of sortedEntries) {
+      const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
+      if (this.#filterChildPath(childPath)) {
+        continue;
+      }
+      if (key === "schema") {
+        const expanded = this.parse(childPath, val);
+        result[key] = expanded;
+      } else {
+        result[key] = this.parse(childPath, val);
+      }
+    }
+    return result;
+  }
+
+  /** Parse the operation responses object. */
+  #parseResponses(path: SwaggerPath, value: any): any {
+    let result: any = {};
+    for (const [code, data] of Object.entries(value)) {
+      const childPath = new SwaggerPath(code, PathKind.DefinitionKey, path);
+      result[code] = this.#parseResponse(childPath, data);
+    }
+    return result;
+  }
+
+  /** Parse an Operation schema object, with special handling for parameters. */
+  #parseOperation(path: SwaggerPath, value: any): any {
+    let result: any = {};
+    const sortedEntries = Object.entries(value).sort();
+    for (const [key, val] of sortedEntries) {
+      const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
+      if (this.#filterChildPath(childPath)) {
+        continue;
+      }
+      if (key === "parameters") {
+        // mix in any parameters from parameterized host
+        const hostParams = this.parameterizedHost?.parameters ?? [];
+        const allParams = [...(val as Array<any>), ...hostParams];
+
+        const expanded = this.parse(childPath, allParams);
+        // ensure parameters are sorted by name since this ordering doesn't
+        // matter from a REST API perspective.
+        const sorted = (expanded as Array<any>).sort((a: any, b: any) => {
+          if (a.name < b.name) {
+            return -1;
+          } else if (a.name > b.name) {
+            return 1;
+          } else {
+            return 0;
+          }
+        });
+        for (const param of sorted) {
+          // normalize any path parameter names, since they don't surface in the
+          // client.
+          if (param.in === "path") {
+            param.name = this.#normalizeName(param.name);
+          }
+        }
+        result[key] = sorted;
+      } else if (key === "responses") {
+        result[key] = this.#parseResponses(childPath, val);
+      } else {
+        result[key] = this.parse(childPath, value[key]);
+      }
+    }
+    return result;
+  }
+
+  /** Parse each verb/operation pair. */
+  #parseVerbs(path: SwaggerPath, value: any): any {
+    let result: any = {};
+    const sortedVerbs = Object.entries(value).sort();
+    for (const [verb, data] of sortedVerbs) {
+      const childPath = new SwaggerPath(verb, PathKind.OperationKey, path);
+      result[verb] = this.#parseOperation(childPath, data);
+    }
+    return result;
+  }
+
+  /** Pare the entire Paths object. */
   parsePaths(path: SwaggerPath, value: any): any {
     let result: any = {};
-    for (const [operationPath, data] of Object.entries(value)) {
+    const sortedPaths = Object.entries(value).sort();
+    for (const [operationPath, pathData] of sortedPaths) {
       // normalize the path to coerce the naming convention
       const normalizedPath = this.#normalizePath(operationPath);
       const childPath = new SwaggerPath(
@@ -112,33 +197,66 @@ export class SwaggerParser {
         PathKind.OperationKey,
         path
       );
-      result[normalizedPath] = this.parseObject(childPath, data);
+      result[normalizedPath] = this.#parseVerbs(childPath, pathData);
     }
     return result;
   }
 
   parseArray(path: SwaggerPath, value: any[]): any {
-    console.log(`Array parse: ${path.fullPath()}`);
+    // console.log(`Array parse: ${path.fullPath()}`);
     // visit array objects but not arrays of primitives
     if (value.length > 0 && typeof value[0] === "object") {
       const values: any[] = [];
-      value.forEach((v, i) => {
+      for (let i = 0; i < value.length; i++) {
+        const item = value[i];
         const childPath = new SwaggerPath(`[${i}]`, PathKind.ArrayIndex, path);
-        values.push(this.parseObject(childPath, v));
-      });
+        values.push(this.parse(childPath, item));
+      }
+      return values;
     } else {
       return value;
     }
   }
 
   parseObject(path: SwaggerPath, value: any): any {
-    console.log(`Object parse: ${path.fullPath()}`);
+    // console.log(`Object parse: ${path.fullPath()}`);
+
+    // Retrieve any allOf references before parsing
+    const allOf = value["allOf"];
+    delete value["allOf"];
+    let expAllOf: any[] = [];
+    if (allOf) {
+      expAllOf = this.parse(path, allOf);
+    }
+
     if (!this.#isReference(value)) {
-      return this.parse(path, value);
+      const result: any = {};
+      // visit each key in the object in sorted order
+      const sortedEntries = Object.entries(value).sort();
+      for (const [key, val] of sortedEntries) {
+        if (key === "attributes" && this.initialized) {
+          let test = "best";
+        }
+        let allVal = val as any;
+        // combine any properties that may be added from "allOf" references
+        if (typeof val === "object") {
+          for (const item of expAllOf) {
+            const match = (item as any)[key] ?? {};
+            allVal = { ...allVal, ...match };
+          }
+        }
+        const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
+        if (this.#filterChildPath(childPath)) {
+          continue;
+        }
+        result[key] = this.parse(childPath, allVal);
+      }
+      return result;
     } else {
       // get the value of the $ref key
       const ref = (value as any)["$ref"];
-      return this.#handleReference(ref);
+      const expanded = this.#handleReference(ref);
+      return expanded;
     }
   }
 
@@ -176,18 +294,36 @@ export class SwaggerParser {
     return Object.keys(value).includes("$ref");
   }
 
+  #normalizeName(name: string): string {
+    return name.replace(/\W/g, "").toLowerCase();
+  }
+
   #normalizePath(path: string): string {
-    let pathComponents = path.split("/");
+    let normalizedPath = "";
+    if (this.parameterizedHost) {
+      if (this.parameterizedHost.useSchemePrefix) {
+        // FIXME: pull this from the spec
+        const scheme = "https";
+        normalizedPath += `${scheme}://`;
+      }
+      normalizedPath += this.parameterizedHost.hostTemplate;
+    } else if (this.host) {
+      normalizedPath += this.host;
+    }
+    normalizedPath += path;
+    // divide the path string to isolate the parameters from the regular text
+    const pathComponents = normalizedPath.split(/({[^}]+})/);
     for (const comp of pathComponents) {
       // if comp is surrounded by curly braces, normalize the name
       const match = comp.match(/{(.+)}/);
       if (match) {
         // delete all non-alphanumeric characters and force to lowercase
-        const newName = match[1].replace(/\W/g, "").toLowerCase();
+        const newName = this.#normalizeName(match[1]);
         pathComponents[pathComponents.indexOf(comp)] = `{${newName}}`;
       }
     }
-    return pathComponents.join("/");
+    normalizedPath = pathComponents.join("");
+    return normalizedPath;
   }
 
   #handleReference(ref: string): any {
@@ -200,7 +336,7 @@ export class SwaggerParser {
     }
     let match = this.definitions.get(refResult.name, refResult.registry);
     if (match) {
-      return match.value;
+      return match;
     } else {
       // keep a reference so we can resolve on a subsequent pass
       this.definitions.logUnresolvedReference(refResult.name);
@@ -218,13 +354,36 @@ export class SwaggerParser {
     // These are documentation-only properties that don't affect the shape of the service.
     if (path.name === "description") return true;
     if (path.name === "summary") return true;
+    if (path.name === "tags") return true;
+    if (path.name === "operationId") return true;
+    if (path.name === "examples") return true;
 
+    // Extensions that are intended for consumption by Autorest and thus
+    // don't impact the REST API shape.
+    if (path.name === "x-ms-examples") return true;
+    if (path.name === "x-ms-parameter-location") return true;
+    if (path.name === "x-ms-client-name") return true;
+    if (path.name === "x-ms-skip-url-encoding") return true;
+    if (path.name === "x-ms-code-generation-settings") return true;
+    if (path.name === "x-ms-enum") return true;
+    if (path.name === "x-ms-parameter-grouping") return true;
+    if (path.name === "x-ms-client-flatter") return true;
+    if (path.name === "x-ms-client-default") return true;
+
+    // FIXME: These really? Seem like they should apply.
+    if (path.name === "format") return true;
+    if (path.name === "minLength") return true;
+
+    // Top-level Swagger properties that we don't care about.
     if (fullPath === "externalDocs") return true;
     if (fullPath === "tags") return true;
     if (fullPath === "definitions") return true;
     if (fullPath === "parameters") return true;
     if (fullPath === "responses") return true;
     if (fullPath === "securityDefinitions") return true;
+    if (fullPath === "info.title") return true;
+    if (fullPath === "info.description") return true;
+    if (fullPath === "info.x-typespec-generated") return true;
     return false;
   }
 }

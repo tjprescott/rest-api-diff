@@ -1,6 +1,6 @@
 export interface ParameterizedHost {
   hostTemplate: string;
   useSchemePrefix: boolean;
-  positionInOperation: string;
+  positionInOperation: "first" | "last";
   parameters: any[];
 }

@@ -8,12 +8,14 @@ dictionaries:
 words:
   - openapi
   - phost
+  - APIV
 ignorePaths:
   - "**/node_modules/**"
   - "**/dist/**"
   - "**/dist-dev/**"
   - "**/.docusaurus/**"
   - "**/CHANGELOG.md"
+  - "package.json"
   - packages/website/build/**
   - common/scripts/*
 patterns:

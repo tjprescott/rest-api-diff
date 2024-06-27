@@ -10,9 +10,7 @@
       }
     ]
   },
-  "schemes": [
-    "https"
-  ],
+  "schemes": ["https"],
   "x-ms-parameterized-host": {
     "hostTemplate": "{vaultBaseUrl}",
     "useSchemePrefix": false,
@@ -27,17 +25,11 @@
       }
     ]
   },
-  "produces": [
-    "application/json"
-  ],
-  "consumes": [
-    "application/json"
-  ],
+  "produces": ["application/json"],
+  "consumes": ["application/json"],
   "security": [
     {
-      "OAuth2Auth": [
-        "https://vault.azure.net/.default"
-      ]
+      "OAuth2Auth": ["https://vault.azure.net/.default"]
     }
   ],
   "securityDefinitions": {
@@ -628,10 +620,7 @@
           "description": "An object containing more specific information than the current object about the error."
         }
       },
-      "required": [
-        "code",
-        "message"
-      ]
+      "required": ["code", "message"]
     },
     "Azure.Core.Foundations.ErrorResponse": {
       "type": "object",
@@ -642,9 +631,7 @@
           "description": "The error object."
         }
       },
-      "required": [
-        "error"
-      ]
+      "required": ["error"]
     },
     "Azure.Core.Foundations.InnerError": {
       "type": "object",
@@ -744,9 +731,7 @@
           "readOnly": true
         }
       },
-      "required": [
-        "id"
-      ]
+      "required": ["id"]
     },
     "DeletedSecretListResult": {
       "type": "object",
@@ -765,9 +750,7 @@
           "description": "The link to the next page of items"
         }
       },
-      "required": [
-        "value"
-      ]
+      "required": ["value"]
     },
     "DeletionRecoveryLevel": {
       "type": "string",
@@ -873,9 +856,7 @@
           "description": "The link to the next page of items"
         }
       },
-      "required": [
-        "value"
-      ]
+      "required": ["value"]
     },
     "PagedSecretItem": {
       "type": "object",
@@ -894,9 +875,7 @@
           "description": "The link to the next page of items"
         }
       },
-      "required": [
-        "value"
-      ]
+      "required": ["value"]
     },
     "SecretAttributes": {
       "type": "object",
@@ -988,9 +967,7 @@
           "readOnly": true
         }
       },
-      "required": [
-        "id"
-      ]
+      "required": ["id"]
     },
     "SecretListResult": {
       "type": "object",
@@ -1009,9 +986,7 @@
           "description": "The link to the next page of items"
         }
       },
-      "required": [
-        "value"
-      ]
+      "required": ["value"]
     },
     "SecretProperties": {
       "type": "object",
@@ -1034,9 +1009,7 @@
           "x-ms-client-name": "secretBundleBackup"
         }
       },
-      "required": [
-        "value"
-      ]
+      "required": ["value"]
     },
     "SecretSetParameters": {
       "type": "object",
@@ -1063,9 +1036,7 @@
           "x-ms-client-name": "secretAttributes"
         }
       },
-      "required": [
-        "value"
-      ]
+      "required": ["value"]
     },
     "SecretUpdateParameters": {
       "type": "object",

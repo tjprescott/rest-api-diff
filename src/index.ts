@@ -3,6 +3,7 @@ import { DiffRuleResult, diffRules } from "./diffRules/rules.js";
 import * as fs from "fs";
 import { SwaggerParser, SwaggerParserOptions } from "./parser.js";
 const { diff } = pkg;
+import { OpenAPIV2 } from "openapi-types";
 
 async function loadJsonFile(path: string): Promise<any> {
   const fileContent = fs.readFileSync(path, "utf-8");
@@ -22,7 +23,7 @@ async function loadJsonContents(path: string): Promise<Map<string, any>> {
       continue;
     }
     const name = filepath.split("/").pop()!.split(".")[0];
-    console.log(`Loading ${path}/${filepath}`);
+    // console.log(`Loading ${path}/${filepath}`);
     // skip non-JSON files
     if (filepath.endsWith(".json")) {
       jsonContents.set(name, await loadJsonFile(`${path}/${filepath}`));
@@ -67,8 +68,9 @@ async function main(args: string[]) {
   if (!differences) {
     console.log("No differences found");
   } else {
-    console.log(JSON.stringify(differences, null, 2));
-    console.warn(`Found ${differences.length} differences!`);
+    console.warn(
+      `Found ${differences.length} differences! See diff.json, lhs.json, and rhs.json for details.`
+    );
     // dump the differences to a file
     fs.writeFileSync("diff.json", JSON.stringify(differences, null, 2));
   }
@@ -90,11 +92,11 @@ function processRules(data: Diff<any, any>): boolean {
         continue;
       case DiffRuleResult.Okay:
         // stop processing rules
-        console.log(`Rule passed: ${rule.name}`);
+        // console.log(`Rule passed: ${rule.name}`);
         return false;
     }
   }
-  console.error(`Unhandled diff: ${JSON.stringify(data, null, 2)}`);
+  // console.error(`Unhandled diff: ${JSON.stringify(data, null, 2)}`);
   return true;
 }
 
