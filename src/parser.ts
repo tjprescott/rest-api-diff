@@ -3,11 +3,6 @@ import { DefinitionRegistry, RegistryKind } from "./definitions.js";
 import { ParameterizedHost } from "./extensions/parameterized-host.js";
 import { PathKind, SwaggerPath } from "./paths.js";
 
-/** Options to set on the Swagger parsing. */
-export interface SwaggerParserOptions {
-  applyFilteringRules?: boolean;
-}
-
 export interface ReferenceMetadata {
   name: string;
   registry: RegistryKind;
@@ -17,14 +12,12 @@ export interface ReferenceMetadata {
 /** A class for parsing Swagger files into an expanded, normalized form. */
 export class SwaggerParser {
   private definitions: DefinitionRegistry;
-  private options?: SwaggerParserOptions;
   private parameterizedHost?: ParameterizedHost;
   private host?: string;
   private result = {};
   private initialized: boolean = false;
 
-  constructor(map: Map<string, any>, options?: SwaggerParserOptions) {
-    this.options = options;
+  constructor(map: Map<string, any>) {
     this.definitions = new DefinitionRegistry(map, this);
     this.definitions.initialize();
     this.initialized = true;
@@ -69,9 +62,6 @@ export class SwaggerParser {
 
     for (const [key, val] of Object.entries(obj)) {
       const path = new SwaggerPath(key, PathKind.SwaggerProperty);
-      if (this.#filterChildPath(path)) {
-        continue;
-      }
       switch (key) {
         case "swagger":
         case "info":
@@ -87,9 +77,6 @@ export class SwaggerParser {
         case "securityDefinitions":
         case "tags":
         case "externalDocs":
-          if (key === "consumes") {
-            let test = "best";
-          }
           result[key] = this.parse(path, val);
           break;
         case "paths":
@@ -108,9 +95,6 @@ export class SwaggerParser {
     const sortedEntries = Object.entries(value).sort();
     for (const [key, val] of sortedEntries) {
       const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
-      if (this.#filterChildPath(childPath)) {
-        continue;
-      }
       if (key === "schema") {
         const expanded = this.parse(childPath, val);
         result[key] = expanded;
@@ -137,9 +121,6 @@ export class SwaggerParser {
     const sortedEntries = Object.entries(value).sort();
     for (const [key, val] of sortedEntries) {
       const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
-      if (this.#filterChildPath(childPath)) {
-        continue;
-      }
       if (key === "parameters") {
         // mix in any parameters from parameterized host
         const hostParams = this.parameterizedHost?.parameters ?? [];
@@ -234,9 +215,6 @@ export class SwaggerParser {
       // visit each key in the object in sorted order
       const sortedEntries = Object.entries(value).sort();
       for (const [key, val] of sortedEntries) {
-        if (key === "attributes" && this.initialized) {
-          let test = "best";
-        }
         let allVal = val as any;
         // combine any properties that may be added from "allOf" references
         if (typeof val === "object") {
@@ -246,9 +224,6 @@ export class SwaggerParser {
           }
         }
         const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
-        if (this.#filterChildPath(childPath)) {
-          continue;
-        }
         result[key] = this.parse(childPath, allVal);
       }
       return result;
@@ -344,46 +319,5 @@ export class SwaggerParser {
         $ref: ref,
       };
     }
-  }
-
-  /** Applies logic to omit keys being expanded in the Swagger. */
-  #filterChildPath(path: SwaggerPath): boolean {
-    if (!this.options?.applyFilteringRules) return false;
-    if (path.kind !== PathKind.SwaggerProperty) return false;
-    const fullPath = path.fullPath();
-    // These are documentation-only properties that don't affect the shape of the service.
-    if (path.name === "description") return true;
-    if (path.name === "summary") return true;
-    if (path.name === "tags") return true;
-    if (path.name === "operationId") return true;
-    if (path.name === "examples") return true;
-
-    // Extensions that are intended for consumption by Autorest and thus
-    // don't impact the REST API shape.
-    if (path.name === "x-ms-examples") return true;
-    if (path.name === "x-ms-parameter-location") return true;
-    if (path.name === "x-ms-client-name") return true;
-    if (path.name === "x-ms-skip-url-encoding") return true;
-    if (path.name === "x-ms-code-generation-settings") return true;
-    if (path.name === "x-ms-enum") return true;
-    if (path.name === "x-ms-parameter-grouping") return true;
-    if (path.name === "x-ms-client-flatter") return true;
-    if (path.name === "x-ms-client-default") return true;
-
-    // FIXME: These really? Seem like they should apply.
-    if (path.name === "format") return true;
-    if (path.name === "minLength") return true;
-
-    // Top-level Swagger properties that we don't care about.
-    if (fullPath === "externalDocs") return true;
-    if (fullPath === "tags") return true;
-    if (fullPath === "definitions") return true;
-    if (fullPath === "parameters") return true;
-    if (fullPath === "responses") return true;
-    if (fullPath === "securityDefinitions") return true;
-    if (fullPath === "info.title") return true;
-    if (fullPath === "info.description") return true;
-    if (fullPath === "info.x-typespec-generated") return true;
-    return false;
   }
 }
