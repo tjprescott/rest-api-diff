@@ -12,6 +12,7 @@ const specificPathsToIgnore = [
   "parameters",
   "responses",
   "securityDefinitions",
+  "schemes",
 ];
 
 const swaggerPropertiesToIgnore = [

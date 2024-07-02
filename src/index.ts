@@ -1,5 +1,5 @@
-import pkg, { Diff } from "deep-diff";
-import { DiffRuleResult, diffRules } from "./diffRules/rules.js";
+import pkg, { Diff, DiffDeleted, DiffEdit, DiffNew } from "deep-diff";
+import { DiffRuleResult, allRules } from "./rules/rules.js";
 import * as fs from "fs";
 import { SwaggerParser } from "./parser.js";
 const { diff } = pkg;
@@ -57,8 +57,8 @@ async function main(args: string[]) {
   let rhs = new SwaggerParser(await loadJsonContents(in2)).asJSON();
 
   // process the rules to filter out any irrelevant differences
-  const differences = processDiff(diff(lhs, rhs));
-  [lhs, rhs] = pruneDocuments(lhs, rhs, differences?.nonViolations);
+  const differences = processDiff(diff(lhs, rhs), lhs, rhs);
+  [lhs, rhs] = pruneDocuments(lhs, rhs, differences?.noViolations);
   fs.writeFileSync("lhs.json", JSON.stringify(lhs, null, 2));
   fs.writeFileSync("rhs.json", JSON.stringify(rhs, null, 2));
 
@@ -105,17 +105,19 @@ function deletePath(
 function pruneDocuments(
   inputLhs: OpenAPIV2.Document,
   inputRhs: OpenAPIV2.Document,
-  differences: Diff<any, any>[] | undefined
+  differences: DiffItem[] | undefined
 ): [OpenAPIV2.Document, OpenAPIV2.Document] {
   let lhs = inputLhs;
   let rhs = inputRhs;
   for (const diff of differences ?? []) {
-    if (!diff.path) continue;
-    if ((diff as any).lhs) {
-      lhs = deletePath(lhs, diff.path);
+    const path = diff.diff.path;
+    if (!path) continue;
+    const lastPath = path[path.length - 1];
+    if ((diff.diff as any).lhs !== undefined) {
+      lhs = deletePath(lhs, path);
     }
-    if ((diff as any).rhs) {
-      rhs = deletePath(rhs, diff.path);
+    if ((diff.diff as any).rhs !== undefined) {
+      rhs = deletePath(rhs, path);
     }
   }
   return [lhs, rhs];
@@ -146,32 +148,44 @@ function isFilterable(path: string[]): boolean {
  * @returns an allowed DiffRuleResult. Only "ContinueProcessing" is not allowed.
  */
 function processRules(
-  data: Diff<any, any>
-):
-  | DiffRuleResult.AssumedViolation
-  | DiffRuleResult.FlaggedViolation
-  | DiffRuleResult.NoViolation {
-  for (const rule of diffRules) {
-    const result = rule(data);
-    switch (result) {
-      case DiffRuleResult.ContinueProcessing:
-        continue;
-      case DiffRuleResult.FlaggedViolation:
-      case DiffRuleResult.NoViolation:
-        return result;
+  data: Diff<any, any>,
+  lhs: OpenAPIV2.Document,
+  rhs: OpenAPIV2.Document
+): DiffItem {
+  let retVal: any = {
+    ruleResult: DiffRuleResult.AssumedViolation,
+    ruleName: undefined,
+    diff: data,
+  };
+  for (const rule of allRules) {
+    const result = rule(data, lhs, rhs);
+    if (result === DiffRuleResult.ContinueProcessing) {
+      continue;
+    } else {
+      retVal.ruleResult = result;
+      retVal.ruleName = rule.name;
+      break;
     }
   }
-  return DiffRuleResult.AssumedViolation;
+  return retVal as DiffItem;
+}
+
+export interface DiffItem {
+  ruleResult: DiffRuleResult;
+  ruleName?: string;
+  diff: DiffNew<any> | DiffEdit<any, any> | DiffDeleted<any>;
 }
 
 export interface DiffResult {
-  clearViolations: Diff<any, any>[];
-  assumedViolations: Diff<any, any>[];
-  nonViolations: Diff<any, any>[];
+  clearViolations: DiffItem[];
+  assumedViolations: DiffItem[];
+  noViolations: DiffItem[];
 }
 
 function processDiff(
-  differences: Diff<any, any>[] | undefined
+  differences: Diff<any, any>[] | undefined,
+  lhs: OpenAPIV2.Document,
+  rhs: OpenAPIV2.Document
 ): DiffResult | undefined {
   if (!differences) {
     return undefined;
@@ -179,20 +193,20 @@ function processDiff(
   const results: DiffResult = {
     clearViolations: [],
     assumedViolations: [],
-    nonViolations: [],
+    noViolations: [],
   };
   for (const data of differences ?? []) {
     if (!isFilterable(data.path!)) continue;
-    const result = processRules(data);
-    switch (result) {
+    const result = processRules(data, lhs, rhs);
+    switch (result.ruleResult) {
       case DiffRuleResult.AssumedViolation:
-        results.assumedViolations.push(data);
+        results.assumedViolations.push(result);
         break;
       case DiffRuleResult.FlaggedViolation:
-        results.clearViolations.push(data);
+        results.clearViolations.push(result);
         break;
       case DiffRuleResult.NoViolation:
-        results.nonViolations.push(data);
+        results.noViolations.push(result);
         break;
       default:
         throw new Error(`Unexpected result ${result}`);

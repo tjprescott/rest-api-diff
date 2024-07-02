@@ -1,3 +1,5 @@
+import * as crypto from "crypto";
+import { OpenAPI, OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
 import { ParameterizedHost } from "./extensions/parameterized-host.js";
 
@@ -11,6 +13,9 @@ export interface ReferenceMetadata {
 export class SwaggerParser {
   private definitions: DefinitionRegistry;
   private parameterizedHost?: ParameterizedHost;
+  private defaultConsumes?: string[];
+  private defaultProduces?: string[];
+  private errorSchemas: Map<string, OpenAPIV2.SchemaObject> = new Map();
   private host?: string;
   private result = {};
 
@@ -50,10 +55,14 @@ export class SwaggerParser {
   parseRoot(obj: any): any {
     let result: any = {};
 
-    // Retrieve any parameterized host information before parsing
+    // Retrieve any top-level defaults that need to be normalized later on.
     this.parameterizedHost = obj["x-ms-parameterized-host"];
-    delete obj["x-ms-parameterized-host"];
+    this.defaultConsumes = obj["consumes"];
+    this.defaultProduces = obj["produces"];
     this.host = obj["host"];
+    delete obj["x-ms-parameterized-host"];
+    delete obj["consumes"];
+    delete obj["produces"];
     delete obj["host"];
 
     for (const [key, val] of Object.entries(obj)) {
@@ -99,11 +108,47 @@ export class SwaggerParser {
     return result;
   }
 
+  #parseErrorName(data: any): string {
+    let name = "";
+    const schema = data["schema"];
+    if (schema) {
+      const ref = schema["$ref"];
+      if (ref) {
+        const match = ref.match(/#\/definitions\/(.+)/);
+        if (match) {
+          name = match[1];
+        }
+      }
+    }
+    if (name === "") {
+      // If we can't find a name, generate one based on a hash of the description.
+      const desc = data["description"];
+      const tag = crypto
+        .createHash("sha256")
+        .update(desc)
+        .digest("hex")
+        .slice(0, 8);
+      name = `Error_${tag}`;
+    }
+    return name;
+  }
+
   /** Parse the operation responses object. */
   #parseResponses(value: any): any {
     let result: any = {};
     for (const [code, data] of Object.entries(value)) {
-      result[code] = this.#parseResponse(data);
+      if (code === "default") {
+        // Don't expand the default response. We will handle this in a special way.
+        const errorName = this.#parseErrorName(data);
+        const expandedError = this.parse(data);
+        this.errorSchemas.set(errorName, expandedError);
+        // Later we will revisit and replace all of there with a value indicating they are, or are not, compatible.
+        result[code] = {
+          $error: errorName,
+        };
+      } else {
+        result[code] = this.#parseResponse(data);
+      }
     }
     return result;
   }
@@ -111,6 +156,8 @@ export class SwaggerParser {
   /** Parse an Operation schema object, with special handling for parameters. */
   #parseOperation(value: any): any {
     let result: any = {};
+    value["consumes"] = value["consumes"] ?? this.defaultConsumes;
+    value["produces"] = value["produces"] ?? this.defaultProduces;
     const sortedEntries = Object.entries(value).sort();
     for (const [key, val] of sortedEntries) {
       if (key === "parameters") {
