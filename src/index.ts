@@ -1,7 +1,7 @@
 import pkg, { Diff } from "deep-diff";
 import { DiffRuleResult, diffRules } from "./diffRules/rules.js";
 import * as fs from "fs";
-import { SwaggerParser, SwaggerParserOptions } from "./parser.js";
+import { SwaggerParser } from "./parser.js";
 const { diff } = pkg;
 import { OpenAPIV2 } from "openapi-types";
 
@@ -121,6 +121,24 @@ function pruneDocuments(
   return [lhs, rhs];
 }
 
+/** Determines if a rule can be applied. */
+function isFilterable(path: string[]): boolean {
+  const pathLength = path.length;
+  if (pathLength < 2) return true;
+  const firstPath = path[0];
+  const secondToLastPath = path[path.length - 2];
+  // Special top-level collections are key-value pairs where the keys aren't filterable
+  if (pathLength === 2) {
+    if (firstPath === "parameters") return false;
+    if (firstPath === "definitions") return false;
+    if (firstPath === "responses") return false;
+    if (firstPath === "securityDefinitions") return false;
+  }
+  // properties can appear anywhere and property keys are not filterable by rules!
+  if (secondToLastPath === "properties") return false;
+  return true;
+}
+
 /**
  * Processes all rules against the given diff. If no rule confirms or denies
  * an issue, the diff is treated as a failure.
@@ -164,6 +182,7 @@ function processDiff(
     nonViolations: [],
   };
   for (const data of differences ?? []) {
+    if (!isFilterable(data.path!)) continue;
     const result = processRules(data);
     switch (result) {
       case DiffRuleResult.AssumedViolation:

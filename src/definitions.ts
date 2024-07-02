@@ -1,5 +1,4 @@
 import { SwaggerParser } from "./parser.js";
-import { PathKind, SwaggerPath } from "./paths.js";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {
@@ -34,37 +33,33 @@ export class DefinitionRegistry {
     for (const [filename, data] of map.entries()) {
       // Gather definitions
       for (const [name, value] of Object.entries(data.definitions ?? {})) {
-        const path = new SwaggerPath(name, PathKind.DefinitionKey);
         if (this.definitions.has(name)) {
           throw new Error(`Duplicate definition: ${name}`);
         }
-        this.definitions.set(name, this.parser.parse(path, value));
+        this.definitions.set(name, this.parser.parse(value));
       }
       // Gather parameter definitions
       for (const [name, value] of Object.entries(data.parameters ?? {})) {
-        const path = new SwaggerPath(name, PathKind.DefinitionKey);
         if (this.parameters.has(name)) {
           throw new Error(`Duplicate parameter: ${name}`);
         }
-        this.parameters.set(name, this.parser.parse(path, value));
+        this.parameters.set(name, this.parser.parse(value));
       }
       // Gather responses
       for (const [name, value] of Object.entries(data.responses ?? {})) {
-        const path = new SwaggerPath(name, PathKind.DefinitionKey);
         if (this.responses.has(name)) {
           throw new Error(`Duplicate response: ${name}`);
         }
-        this.responses.set(name, this.parser.parse(path, value));
+        this.responses.set(name, this.parser.parse(value));
       }
       // Gather security definitions
       for (const [name, value] of Object.entries(
         data.securityDefinitions ?? {}
       )) {
-        const path = new SwaggerPath(name, PathKind.DefinitionKey);
         if (this.securityDefinitions.has(name)) {
           throw new Error(`Duplicate security definition: ${name}`);
         }
-        this.securityDefinitions.set(name, this.parser.parse(path, value));
+        this.securityDefinitions.set(name, this.parser.parse(value));
       }
     }
   }
@@ -74,23 +69,19 @@ export class DefinitionRegistry {
     // It will NOT solve any circular references!
     this.resetUnresolvedReferences();
     for (const [name, value] of this.definitions.entries()) {
-      const path = new SwaggerPath(name, PathKind.DefinitionKey);
-      const expanded = this.parser.parse(path, value);
+      const expanded = this.parser.parse(value);
       this.definitions.set(name, expanded);
     }
     for (const [name, value] of this.parameters.entries()) {
-      const path = new SwaggerPath(name, PathKind.DefinitionKey);
-      const expanded = this.parser.parse(path, value);
+      const expanded = this.parser.parse(value);
       this.parameters.set(name, expanded);
     }
     for (const [name, value] of this.responses.entries()) {
-      const path = new SwaggerPath(name, PathKind.DefinitionKey);
-      const expanded = this.parser.parse(path, value);
+      const expanded = this.parser.parse(value);
       this.responses.set(name, expanded);
     }
     for (const [name, value] of this.securityDefinitions.entries()) {
-      const path = new SwaggerPath(name, PathKind.DefinitionKey);
-      const expanded = this.parser.parse(path, value);
+      const expanded = this.parser.parse(value);
       this.securityDefinitions.set(name, expanded);
     }
   }

@@ -1,7 +1,5 @@
-import { OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
 import { ParameterizedHost } from "./extensions/parameterized-host.js";
-import { PathKind, SwaggerPath } from "./paths.js";
 
 export interface ReferenceMetadata {
   name: string;
@@ -15,12 +13,10 @@ export class SwaggerParser {
   private parameterizedHost?: ParameterizedHost;
   private host?: string;
   private result = {};
-  private initialized: boolean = false;
 
   constructor(map: Map<string, any>) {
     this.definitions = new DefinitionRegistry(map, this);
     this.definitions.initialize();
-    this.initialized = true;
     for (const [_, data] of map.entries()) {
       this.result = { ...this.result, ...this.parseRoot(data) };
     }
@@ -36,17 +32,17 @@ export class SwaggerParser {
   }
 
   /** Parse a generic node. */
-  parse(path: SwaggerPath, obj: any): any {
+  parse(obj: any): any {
     if (obj === undefined || obj === null) {
-      throw new Error(`Object is ${obj} at path: ${path.fullPath()}`);
+      throw new Error(`Object is ${obj}}`);
     }
     // base case for primitive types
     if (typeof obj !== "object") {
       return obj;
     } else if (Array.isArray(obj)) {
-      return this.parseArray(path, obj);
+      return this.parseArray(obj);
     } else if (typeof obj === "object") {
-      return this.parseObject(path, obj);
+      return this.parseObject(obj);
     }
   }
 
@@ -61,7 +57,6 @@ export class SwaggerParser {
     delete obj["host"];
 
     for (const [key, val] of Object.entries(obj)) {
-      const path = new SwaggerPath(key, PathKind.SwaggerProperty);
       switch (key) {
         case "swagger":
         case "info":
@@ -77,10 +72,10 @@ export class SwaggerParser {
         case "securityDefinitions":
         case "tags":
         case "externalDocs":
-          result[key] = this.parse(path, val);
+          result[key] = this.parse(val);
           break;
         case "paths":
-          result[key] = this.parsePaths(path, val);
+          result[key] = this.parsePaths(val);
           break;
         default:
           throw new Error(`Unhandled root key: ${key}`);
@@ -90,43 +85,40 @@ export class SwaggerParser {
   }
 
   /** Parse a response object. */
-  #parseResponse(path: SwaggerPath, value: any): any {
+  #parseResponse(value: any): any {
     let result: any = {};
     const sortedEntries = Object.entries(value).sort();
     for (const [key, val] of sortedEntries) {
-      const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
       if (key === "schema") {
-        const expanded = this.parse(childPath, val);
+        const expanded = this.parse(val);
         result[key] = expanded;
       } else {
-        result[key] = this.parse(childPath, val);
+        result[key] = this.parse(val);
       }
     }
     return result;
   }
 
   /** Parse the operation responses object. */
-  #parseResponses(path: SwaggerPath, value: any): any {
+  #parseResponses(value: any): any {
     let result: any = {};
     for (const [code, data] of Object.entries(value)) {
-      const childPath = new SwaggerPath(code, PathKind.DefinitionKey, path);
-      result[code] = this.#parseResponse(childPath, data);
+      result[code] = this.#parseResponse(data);
     }
     return result;
   }
 
   /** Parse an Operation schema object, with special handling for parameters. */
-  #parseOperation(path: SwaggerPath, value: any): any {
+  #parseOperation(value: any): any {
     let result: any = {};
     const sortedEntries = Object.entries(value).sort();
     for (const [key, val] of sortedEntries) {
-      const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
       if (key === "parameters") {
         // mix in any parameters from parameterized host
         const hostParams = this.parameterizedHost?.parameters ?? [];
         const allParams = [...(val as Array<any>), ...hostParams];
 
-        const expanded = this.parse(childPath, allParams);
+        const expanded = this.parse(allParams);
         // ensure parameters are sorted by name since this ordering doesn't
         // matter from a REST API perspective.
         const sorted = (expanded as Array<any>).sort((a: any, b: any) => {
@@ -147,51 +139,44 @@ export class SwaggerParser {
         }
         result[key] = sorted;
       } else if (key === "responses") {
-        result[key] = this.#parseResponses(childPath, val);
+        result[key] = this.#parseResponses(val);
       } else {
-        result[key] = this.parse(childPath, value[key]);
+        result[key] = this.parse(value[key]);
       }
     }
     return result;
   }
 
   /** Parse each verb/operation pair. */
-  #parseVerbs(path: SwaggerPath, value: any): any {
+  #parseVerbs(value: any): any {
     let result: any = {};
     const sortedVerbs = Object.entries(value).sort();
     for (const [verb, data] of sortedVerbs) {
-      const childPath = new SwaggerPath(verb, PathKind.OperationKey, path);
-      result[verb] = this.#parseOperation(childPath, data);
+      result[verb] = this.#parseOperation(data);
     }
     return result;
   }
 
   /** Pare the entire Paths object. */
-  parsePaths(path: SwaggerPath, value: any): any {
+  parsePaths(value: any): any {
     let result: any = {};
     const sortedPaths = Object.entries(value).sort();
     for (const [operationPath, pathData] of sortedPaths) {
       // normalize the path to coerce the naming convention
       const normalizedPath = this.#normalizePath(operationPath);
-      const childPath = new SwaggerPath(
-        normalizedPath,
-        PathKind.OperationKey,
-        path
-      );
-      result[normalizedPath] = this.#parseVerbs(childPath, pathData);
+      result[normalizedPath] = this.#parseVerbs(pathData);
     }
     return result;
   }
 
-  parseArray(path: SwaggerPath, value: any[]): any {
+  parseArray(value: any[]): any {
     // console.log(`Array parse: ${path.fullPath()}`);
     // visit array objects but not arrays of primitives
     if (value.length > 0 && typeof value[0] === "object") {
       const values: any[] = [];
       for (let i = 0; i < value.length; i++) {
         const item = value[i];
-        const childPath = new SwaggerPath(`[${i}]`, PathKind.ArrayIndex, path);
-        values.push(this.parse(childPath, item));
+        values.push(this.parse(item));
       }
       return values;
     } else {
@@ -199,7 +184,7 @@ export class SwaggerParser {
     }
   }
 
-  parseObject(path: SwaggerPath, value: any): any {
+  parseObject(value: any): any {
     // console.log(`Object parse: ${path.fullPath()}`);
 
     // Retrieve any allOf references before parsing
@@ -207,7 +192,7 @@ export class SwaggerParser {
     delete value["allOf"];
     let expAllOf: any[] = [];
     if (allOf) {
-      expAllOf = this.parse(path, allOf);
+      expAllOf = this.parse(allOf);
     }
 
     if (!this.#isReference(value)) {
@@ -223,8 +208,7 @@ export class SwaggerParser {
             allVal = { ...allVal, ...match };
           }
         }
-        const childPath = new SwaggerPath(key, PathKind.SwaggerProperty, path);
-        result[key] = this.parse(childPath, allVal);
+        result[key] = this.parse(allVal);
       }
       return result;
     } else {
