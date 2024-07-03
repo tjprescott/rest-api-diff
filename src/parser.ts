@@ -36,6 +36,11 @@ export class SwaggerParser {
     return this.result;
   }
 
+  /** Returns the error schemas discovered for this parser. */
+  getErrorSchemas(): Map<string, OpenAPIV2.SchemaObject> {
+    return this.errorSchemas;
+  }
+
   /** Parse a generic node. */
   parse(obj: any): any {
     if (obj === undefined || obj === null) {
@@ -140,8 +145,10 @@ export class SwaggerParser {
       if (code === "default") {
         // Don't expand the default response. We will handle this in a special way.
         const errorName = this.#parseErrorName(data);
-        const expandedError = this.parse(data);
-        this.errorSchemas.set(errorName, expandedError);
+        if (!this.errorSchemas.has(errorName)) {
+          const expandedError = this.parse(data);
+          this.errorSchemas.set(errorName, expandedError);
+        }
         // Later we will revisit and replace all of there with a value indicating they are, or are not, compatible.
         result[code] = {
           $error: errorName,

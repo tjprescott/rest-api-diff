@@ -6,6 +6,7 @@ import { ignoreApiVersionMinLengthRule } from "./ignore-api-version-min-length.j
 import { OpenAPIV2, OpenAPIV3 } from "openapi-types";
 import { ignoreFormatUriRule } from "./ignore-format-uri.js";
 import { ignoreNextLinkFormatUriRule } from "./ignore-next-link-format-uri.js";
+import { compareErrorsRule } from "./compare-errors.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum DiffRuleResult {
@@ -22,8 +23,9 @@ export enum DiffRuleResult {
 export type RuleSignature = (
   data: Diff<any, any>,
   lhs?: OpenAPIV2.Document,
-  rhs?: OpenAPIV2.Document
-) => DiffRuleResult;
+  rhs?: OpenAPIV2.Document,
+  errorSchemas?: Map<string, OpenAPIV2.SchemaObject>
+) => DiffRuleResult | [DiffRuleResult, string];
 
 /**
  * Diff rules apply when evaluating the diff between two objects.
@@ -35,4 +37,5 @@ export const allRules: RuleSignature[] = [
   ignoreApiVersionMinLengthRule,
   ignoreFormatUriRule,
   ignoreNextLinkFormatUriRule,
+  compareErrorsRule,
 ];

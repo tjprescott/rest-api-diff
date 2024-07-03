@@ -53,11 +53,21 @@ async function main(args: string[]) {
     process.exit(1);
   }
 
-  let lhs = new SwaggerParser(await loadJsonContents(in1)).asJSON();
-  let rhs = new SwaggerParser(await loadJsonContents(in2)).asJSON();
+  let leftParser = new SwaggerParser(await loadJsonContents(in1));
+  let rightParser = new SwaggerParser(await loadJsonContents(in2));
+  let lhs = leftParser.asJSON();
+  let rhs = rightParser.asJSON();
+  // collect both error schemas
+  const errorsSchemas = new Map<string, OpenAPIV2.SchemaObject>();
+  for (const [name, value] of Object.entries(lhs.definitions ?? {})) {
+    errorsSchemas.set(name, value as OpenAPIV2.SchemaObject);
+  }
+  for (const [name, value] of Object.entries(rhs.definitions ?? {})) {
+    errorsSchemas.set(name, value as OpenAPIV2.Schema);
+  }
 
   // process the rules to filter out any irrelevant differences
-  const differences = processDiff(diff(lhs, rhs), lhs, rhs);
+  const differences = processDiff(diff(lhs, rhs), lhs, rhs, errorsSchemas);
   [lhs, rhs] = pruneDocuments(lhs, rhs, differences?.noViolations);
   fs.writeFileSync("lhs.json", JSON.stringify(lhs, null, 2));
   fs.writeFileSync("rhs.json", JSON.stringify(rhs, null, 2));
@@ -120,6 +130,17 @@ function pruneDocuments(
       rhs = deletePath(rhs, path);
     }
   }
+  // delete some standard collections from the documents
+  const keysToDelete = [
+    "definitions",
+    "parameters",
+    "responses",
+    "securityDefinitions",
+  ];
+  for (const key of keysToDelete) {
+    delete (lhs as any)[key];
+    delete (rhs as any)[key];
+  }
   return [lhs, rhs];
 }
 
@@ -150,7 +171,8 @@ function isFilterable(path: string[]): boolean {
 function processRules(
   data: Diff<any, any>,
   lhs: OpenAPIV2.Document,
-  rhs: OpenAPIV2.Document
+  rhs: OpenAPIV2.Document,
+  errorSchemas: Map<string, OpenAPIV2.SchemaObject>
 ): DiffItem {
   let retVal: any = {
     ruleResult: DiffRuleResult.AssumedViolation,
@@ -158,8 +180,13 @@ function processRules(
     diff: data,
   };
   for (const rule of allRules) {
-    const result = rule(data, lhs, rhs);
-    if (result === DiffRuleResult.ContinueProcessing) {
+    const result = rule(data, lhs, rhs, errorSchemas);
+    if (Array.isArray(result)) {
+      retVal.ruleResult = result[0];
+      retVal.ruleName = rule.name;
+      retVal.message = result[1];
+      break;
+    } else if (result === DiffRuleResult.ContinueProcessing) {
       continue;
     } else {
       retVal.ruleResult = result;
@@ -173,6 +200,7 @@ function processRules(
 export interface DiffItem {
   ruleResult: DiffRuleResult;
   ruleName?: string;
+  message?: string;
   diff: DiffNew<any> | DiffEdit<any, any> | DiffDeleted<any>;
 }
 
@@ -185,7 +213,8 @@ export interface DiffResult {
 function processDiff(
   differences: Diff<any, any>[] | undefined,
   lhs: OpenAPIV2.Document,
-  rhs: OpenAPIV2.Document
+  rhs: OpenAPIV2.Document,
+  errorsSchemas: Map<string, OpenAPIV2.SchemaObject>
 ): DiffResult | undefined {
   if (!differences) {
     return undefined;
@@ -197,7 +226,7 @@ function processDiff(
   };
   for (const data of differences ?? []) {
     if (!isFilterable(data.path!)) continue;
-    const result = processRules(data, lhs, rhs);
+    const result = processRules(data, lhs, rhs, errorsSchemas);
     switch (result.ruleResult) {
       case DiffRuleResult.AssumedViolation:
         results.assumedViolations.push(result);
