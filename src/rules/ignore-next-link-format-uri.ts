@@ -1,5 +1,5 @@
 import { Diff } from "deep-diff";
-import { DiffRuleResult } from "./rules.js";
+import { RuleResult } from "./rules.js";
 import { OpenAPIV2 } from "openapi-types";
 
 /**
@@ -9,12 +9,12 @@ export function ignoreNextLinkFormatUriRule(
   data: Diff<any, any>,
   lhs?: OpenAPIV2.Document,
   rhs?: OpenAPIV2.Document
-): DiffRuleResult {
-  if (!data.path) return DiffRuleResult.ContinueProcessing;
-  if (data.kind !== "N") return DiffRuleResult.ContinueProcessing;
+): RuleResult {
+  if (!data.path) return RuleResult.ContinueProcessing;
+  if (data.kind !== "N") return RuleResult.ContinueProcessing;
   const path = data.path.join(".");
   if (path.endsWith("properties.nextLink.format")) {
-    return DiffRuleResult.NoViolation;
+    return RuleResult.NoViolation;
   }
-  return DiffRuleResult.ContinueProcessing;
+  return RuleResult.ContinueProcessing;
 }

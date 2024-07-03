@@ -1,5 +1,5 @@
 import { Diff } from "deep-diff";
-import { DiffRuleResult } from "./rules.js";
+import { RuleResult } from "./rules.js";
 import { OpenAPIV2 } from "openapi-types";
 
 function getParameter(
@@ -21,13 +21,13 @@ export function ignoreFormatUriRule(
   data: Diff<any, any>,
   lhs?: OpenAPIV2.Document,
   rhs?: OpenAPIV2.Document
-): DiffRuleResult {
-  if (!data.path) return DiffRuleResult.ContinueProcessing;
-  if (data.kind !== "N") return DiffRuleResult.ContinueProcessing;
+): RuleResult {
+  if (!data.path) return RuleResult.ContinueProcessing;
+  if (data.kind !== "N") return RuleResult.ContinueProcessing;
   const path = data.path.join(".");
   const regex = /parameters\.(\d+)\.format/;
   const match = path.match(regex);
-  if (!match) return DiffRuleResult.ContinueProcessing;
+  if (!match) return RuleResult.ContinueProcessing;
   const paramPath = data.path.slice(0, -1);
   const param = getParameter(lhs, paramPath);
   if (!param) {
@@ -35,7 +35,7 @@ export function ignoreFormatUriRule(
   }
   const skipUrlEncoding = param["x-ms-skip-url-encoding"];
   if (skipUrlEncoding && skipUrlEncoding === true) {
-    return DiffRuleResult.NoViolation;
+    return RuleResult.NoViolation;
   }
-  return DiffRuleResult.ContinueProcessing;
+  return RuleResult.ContinueProcessing;
 }

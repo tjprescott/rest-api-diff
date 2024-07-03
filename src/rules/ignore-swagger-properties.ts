@@ -1,5 +1,5 @@
 import { Diff } from "deep-diff";
-import { DiffRuleResult } from "./rules.js";
+import { RuleResult } from "./rules.js";
 
 const specificPathsToIgnore = [
   "definitions",
@@ -35,19 +35,17 @@ const swaggerPropertiesToIgnore = [
   "x-ms-parameter-location",
 ];
 
-export function ignoreSwaggerPropertiesRule(
-  data: Diff<any, any>
-): DiffRuleResult {
-  if (!data.path) return DiffRuleResult.ContinueProcessing;
+export function ignoreSwaggerPropertiesRule(data: Diff<any, any>): RuleResult {
+  if (!data.path) return RuleResult.ContinueProcessing;
   const fullPath = data.path.join(".");
   const lastPath = data.path.slice(-1)[0];
   if (swaggerPropertiesToIgnore.includes(lastPath)) {
-    return DiffRuleResult.NoViolation;
+    return RuleResult.NoViolation;
   }
   for (const pathToIgnore of specificPathsToIgnore) {
     if (fullPath.startsWith(pathToIgnore)) {
-      return DiffRuleResult.NoViolation;
+      return RuleResult.NoViolation;
     }
   }
-  return DiffRuleResult.ContinueProcessing;
+  return RuleResult.ContinueProcessing;
 }

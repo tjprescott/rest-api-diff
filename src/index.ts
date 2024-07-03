@@ -1,5 +1,5 @@
 import pkg, { Diff, DiffDeleted, DiffEdit, DiffNew } from "deep-diff";
-import { DiffRuleResult, allRules } from "./rules/rules.js";
+import { RuleResult, allRules } from "./rules/rules.js";
 import * as fs from "fs";
 import { SwaggerParser } from "./parser.js";
 const { diff } = pkg;
@@ -175,7 +175,7 @@ function processRules(
   errorSchemas: Map<string, OpenAPIV2.SchemaObject>
 ): DiffItem {
   let retVal: any = {
-    ruleResult: DiffRuleResult.AssumedViolation,
+    ruleResult: RuleResult.AssumedViolation,
     ruleName: undefined,
     diff: data,
   };
@@ -186,7 +186,7 @@ function processRules(
       retVal.ruleName = rule.name;
       retVal.message = result[1];
       break;
-    } else if (result === DiffRuleResult.ContinueProcessing) {
+    } else if (result === RuleResult.ContinueProcessing) {
       continue;
     } else {
       retVal.ruleResult = result;
@@ -198,7 +198,7 @@ function processRules(
 }
 
 export interface DiffItem {
-  ruleResult: DiffRuleResult;
+  ruleResult: RuleResult;
   ruleName?: string;
   message?: string;
   diff: DiffNew<any> | DiffEdit<any, any> | DiffDeleted<any>;
@@ -228,13 +228,13 @@ function processDiff(
     if (!isFilterable(data.path!)) continue;
     const result = processRules(data, lhs, rhs, errorsSchemas);
     switch (result.ruleResult) {
-      case DiffRuleResult.AssumedViolation:
+      case RuleResult.AssumedViolation:
         results.assumedViolations.push(result);
         break;
-      case DiffRuleResult.FlaggedViolation:
+      case RuleResult.FlaggedViolation:
         results.clearViolations.push(result);
         break;
-      case DiffRuleResult.NoViolation:
+      case RuleResult.NoViolation:
         results.noViolations.push(result);
         break;
       default:

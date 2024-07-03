@@ -1,5 +1,5 @@
 import { Diff } from "deep-diff";
-import { DiffRuleResult as RuleResult } from "./rules.js";
+import { RuleResult as RuleResult } from "./rules.js";
 import { OpenAPIV2 } from "openapi-types";
 
 /**

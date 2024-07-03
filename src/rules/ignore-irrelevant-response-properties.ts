@@ -1,5 +1,5 @@
 import { Diff } from "deep-diff";
-import { DiffRuleResult } from "./rules.js";
+import { RuleResult } from "./rules.js";
 
 const propertValuesToIgnore: Map<string, any> = new Map([
   ["x-nullable", false],
@@ -11,15 +11,15 @@ const propertValuesToIgnore: Map<string, any> = new Map([
  */
 export function ignoreIrrelevantResponsePropertiesRule(
   data: Diff<any, any>
-): DiffRuleResult {
-  if (!data.path) return DiffRuleResult.ContinueProcessing;
+): RuleResult {
+  if (!data.path) return RuleResult.ContinueProcessing;
   const path = data.path;
-  if (path.length < 4) return DiffRuleResult.ContinueProcessing;
-  if (path[3] !== "responses") return DiffRuleResult.ContinueProcessing;
+  if (path.length < 4) return RuleResult.ContinueProcessing;
+  if (path[3] !== "responses") return RuleResult.ContinueProcessing;
   const lastPath = path[path.length - 1];
   const valueToIgnore = propertValuesToIgnore.get(lastPath);
-  if (valueToIgnore === undefined) return DiffRuleResult.ContinueProcessing;
+  if (valueToIgnore === undefined) return RuleResult.ContinueProcessing;
   const value = (data as any).lhs ?? (data as any).rhs;
-  if (value === valueToIgnore) return DiffRuleResult.NoViolation;
-  return DiffRuleResult.ContinueProcessing;
+  if (value === valueToIgnore) return RuleResult.NoViolation;
+  return RuleResult.ContinueProcessing;
 }
