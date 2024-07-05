@@ -13,13 +13,18 @@ against the one generated from TypeSpec to determine if the TypeSpec accurately 
 ## Usage
 
 1. Run `npm run build`
-2. Run `npm run diff -- --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp]`
+2. Run `npm run diff -- --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp] [--group-violations]`
 
 `lhs_path` and `rhs_path` are the paths to the Swagger specifications to compare, or the folders
-containing them. If the paths are folders, the tool will search for all Swagger files in the folder,
-but will not search subfolders. If no Swagger files are found, but TypeSpec files are found and the
-`--compile-tsp` flag it set, the tool will attempt to compile the TypeSpec files to Swagger using
-the `@azure-tools/typspec-autorest` emitter.
+containing them. If the paths are folders, the tool will search for all Swagger files in that folder,
+but will not search subfolders.
+
+### Options
+
+- `--compile-tsp`: The tool will attempt to compile TypeSpec files to Swagger using the
+  `@azure-tools/autorest` emitter, if no Swagger files are found.
+- `--group-violations`: The tool will group violations by rule within `diff.json`, rather than
+  listing them as a flat collection.
 
 ## Output
 
@@ -35,6 +40,7 @@ You can run a visual diff on `lhs.json` and `rhs.json` to visually see the diffe
 `diff.json` contains each specific diff that was found between the two specifications and was not resolved by a rule.
 
 The schema of the diff object:
+
 - `ruleResult`: An enum which describes the result of the rule that was applied to the diff. F = Flagged, A = Assumed, or N = NoViolation.
 - `ruleName`: The name of the rule that was applied to the diff. For assumed violations, this will be null.
 - `message`: For flagged violations, this may contains a message offering more insight into the specific problem.
@@ -50,6 +56,7 @@ The way `openapi-diff` works is by expanding references (except circular referen
 files and applying certain special-casing logic (such as `x-ms-parameterized-host`) in order to produce a "canonical" representation
 of the Swagger. It then compares the two using the `deep-diff` package. The diff elements are run through a pipeline of rules. Each
 rule can make one of three determinations:
+
 - `RuleResult.NoViolation`: this describes a diff that doesn't affect the API surface area, and thus we will ignore the diff and prune
   the path from both `lhs.json` and `rhs.json` so they won't appear in a visual diff.
 - `RuleResult.FlaggedViolation`: a pattern is identified that we confirm affects the API surface area and thus represents a violation.

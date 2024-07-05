@@ -7,6 +7,7 @@ import { OpenAPIV2 } from "openapi-types";
 import { ignoreFormatUriRule } from "./ignore-format-uri.js";
 import { ignoreNextLinkFormatUriRule } from "./ignore-next-link-format-uri.js";
 import { compareErrorsRule } from "./compare-errors.js";
+import { flagTypeDifferencesRule } from "./flag-type-differences.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -38,4 +39,5 @@ export const allRules: RuleSignature[] = [
   ignoreFormatUriRule,
   ignoreNextLinkFormatUriRule,
   compareErrorsRule,
+  flagTypeDifferencesRule,
 ];

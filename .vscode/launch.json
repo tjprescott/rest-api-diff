@@ -14,7 +14,8 @@
         "KeyVaultOriginal/secrets.json",
         "--rhs",
         "KeyVaultGenerated",
-        "--compile-tsp"
+        "--compile-tsp",
+        "--group-violations"
       ]
     }
   ]

@@ -31,6 +31,12 @@ const args = await yargs(hideBin(process.argv))
     describe:
       "If TypeSpec files are found but no Swagger files, will attempt to compile the TypeSpec to Swagger and use that.",
   })
+  .options("group-violations", {
+    type: "boolean",
+    default: false,
+    describe:
+      "Group violations by rule name. If false, will output all violations in a flat collection.",
+  })
   .parse();
 
 await main();
@@ -162,24 +168,54 @@ async function main() {
 
   // process the rules to filter out any irrelevant differences
   const differences = processDiff(diff(lhs, rhs), lhs, rhs, errorsSchemas);
+
+  // prune the documents of any paths that are not relevant and
+  // output them for visual diffing.
   [lhs, rhs] = pruneDocuments(lhs, rhs, differences?.noViolations);
   fs.writeFileSync("lhs.json", JSON.stringify(lhs, null, 2));
   fs.writeFileSync("rhs.json", JSON.stringify(rhs, null, 2));
 
-  const clearViolations = differences?.clearViolations.length ?? 0;
-  const assumedViolations = differences?.assumedViolations.length ?? 0;
-  if (clearViolations + assumedViolations === 0) {
+  const groupViolations = args["group-violations"];
+  const flaggedViolations = differences?.flaggedViolations ?? [];
+  const assumedViolations = differences?.assumedViolations ?? [];
+  const allViolations = [...flaggedViolations, ...assumedViolations];
+  if (allViolations.length === 0) {
     console.log("No differences found");
+    return 0;
+  }
+  // write out the diff.json file based on the grouping preference
+  if (groupViolations) {
+    writeGroupedViolations(allViolations);
   } else {
     console.warn(
-      `Found ${clearViolations} clear violations and ${assumedViolations} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
+      `Found ${flaggedViolations.length} flagged violations and ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
     );
-    // combine clear violations and assumed violations into a single collection and write to disk
-    const combinedViolations = (differences?.clearViolations ?? []).concat(
-      differences?.assumedViolations ?? []
-    );
-    fs.writeFileSync("diff.json", JSON.stringify(combinedViolations, null, 2));
+    writeFlatViolations(allViolations);
   }
+}
+
+async function writeGroupedViolations(differences: DiffItem[]) {
+  const defaultRule = "assumedViolation";
+  const groupedDiff: { [key: string]: DiffItem[] } = {};
+  for (const diff of differences) {
+    const ruleName = diff.ruleName ?? defaultRule;
+    if (!groupedDiff[ruleName]) {
+      groupedDiff[ruleName] = [];
+    }
+    groupedDiff[ruleName]?.push(diff);
+  }
+  const assumedViolations = groupedDiff[defaultRule] ?? [];
+  const ruleViolationCount = differences.length - assumedViolations.length;
+  console.warn(
+    `Found ${ruleViolationCount} violations across ${Object.keys(groupedDiff).length - 1} rules, with ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
+  );
+  // flatten the map into an object where the keys are the rule names and the values are the arrays of diffs
+
+  fs.writeFileSync("diff.json", JSON.stringify(groupedDiff, null, 2));
+}
+
+async function writeFlatViolations(differences: DiffItem[]) {
+  fs.writeFileSync("diff.json", JSON.stringify(differences, null, 2));
 }
 
 /** Deletes a specified path from a given OpenAPI document. */
@@ -299,7 +335,7 @@ export interface DiffItem {
 }
 
 export interface DiffResult {
-  clearViolations: DiffItem[];
+  flaggedViolations: DiffItem[];
   assumedViolations: DiffItem[];
   noViolations: DiffItem[];
 }
@@ -314,7 +350,7 @@ function processDiff(
     return undefined;
   }
   const results: DiffResult = {
-    clearViolations: [],
+    flaggedViolations: [],
     assumedViolations: [],
     noViolations: [],
   };
@@ -326,7 +362,7 @@ function processDiff(
         results.assumedViolations.push(result);
         break;
       case RuleResult.FlaggedViolation:
-        results.clearViolations.push(result);
+        results.flaggedViolations.push(result);
         break;
       case RuleResult.NoViolation:
         results.noViolations.push(result);
