@@ -1,6 +1,5 @@
 import { Diff } from "deep-diff";
 import { RuleResult } from "./rules.js";
-import { OpenAPIV2 } from "openapi-types";
 
 /**
  * Flags when a type value has changed.
@@ -9,6 +8,8 @@ export function flagTypeDifferencesRule(
   data: Diff<any, any>
 ): RuleResult | [RuleResult, string] {
   if (!data.path) return RuleResult.ContinueProcessing;
+  const path = data.path.join(".");
+
   const lastPath = data.path[data.path.length - 1];
   if (lastPath !== "type") return RuleResult.ContinueProcessing;
   const lhs = (data as any).lhs ?? "undefined";

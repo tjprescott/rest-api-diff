@@ -8,6 +8,9 @@ import { ignoreFormatUriRule } from "./ignore-format-uri.js";
 import { ignoreNextLinkFormatUriRule } from "./ignore-next-link-format-uri.js";
 import { compareErrorsRule } from "./compare-errors.js";
 import { flagTypeDifferencesRule } from "./flag-type-differences.js";
+import { compareXMsEnumRule } from "./compare-x-ms-enum.js";
+import { compareResponseRequiredRule } from "./compare-response-required.js";
+import { compareRequestRequiredRule } from "./compare-request-required.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -39,5 +42,8 @@ export const allRules: RuleSignature[] = [
   ignoreFormatUriRule,
   ignoreNextLinkFormatUriRule,
   compareErrorsRule,
+  compareXMsEnumRule,
   flagTypeDifferencesRule,
+  compareResponseRequiredRule,
+  compareRequestRequiredRule,
 ];
