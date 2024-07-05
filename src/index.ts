@@ -2,31 +2,133 @@ import pkg, { Diff, DiffDeleted, DiffEdit, DiffNew } from "deep-diff";
 import { RuleResult, allRules } from "./rules/rules.js";
 import * as fs from "fs";
 import { SwaggerParser } from "./parser.js";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 const { diff } = pkg;
 import { OpenAPIV2 } from "openapi-types";
+import { exec } from "child_process";
 
-async function loadJsonFile(path: string): Promise<any> {
+const args = await yargs(hideBin(process.argv))
+  .usage("Usage: $0 --lhs [path...] --rhs [path...]")
+  .demandOption(["lhs", "rhs"])
+  .options("lhs", {
+    type: "array",
+    demandOption: true,
+    describe:
+      "The files that are the basis for comparison. Can be an array of files or directories. Directories will be crawled for JSON files. Non-Swagger files will be ignored.",
+    coerce: (arg) => arg.map(String),
+  })
+  .options("rhs", {
+    type: "array",
+    demandOption: true,
+    describe:
+      "The files to compare against. Can be an array of files or directories. Directories will be crawled for JSON files. Non-Swagger files will be ignored.",
+    coerce: (arg) => arg.map(String),
+  })
+  .options("compile-tsp", {
+    type: "boolean",
+    default: false,
+    describe:
+      "If TypeSpec files are found but no Swagger files, will attempt to compile the TypeSpec to Swagger and use that.",
+  })
+  .parse();
+
+await main();
+
+/**
+ * Loads Swagger files. If the file is not a Swagger file, it will return undefined.
+ */
+async function loadSwaggerFile(path: string): Promise<any | undefined> {
   const fileContent = fs.readFileSync(path, "utf-8");
-  return JSON.parse(fileContent);
+  try {
+    const jsonContent = JSON.parse(fileContent);
+    if (!jsonContent.swagger) {
+      return undefined;
+    }
+    return jsonContent;
+  } catch (error) {
+    return undefined;
+  }
 }
 
-async function loadJsonContents(path: string): Promise<Map<string, any>> {
-  validatePath(path);
-  const stats = fs.statSync(path);
-  let jsonContents = new Map<string, any>();
-
-  const pathsToLoad = stats.isDirectory() ? fs.readdirSync(path) : [path];
+async function loadFolder(path: string): Promise<Map<string, any> | undefined> {
+  const jsonContents = new Map<string, any>();
+  const pathsToLoad = fs.readdirSync(path);
   for (const filepath of pathsToLoad) {
-    const filePathStats = fs.statSync(`${path}/${filepath}`);
-    // Ignore director for now
+    const fullPath = `${path}/${filepath}`;
+    const filePathStats = fs.statSync(fullPath);
+    // TODO: For now, don't crawl subdirectories.
     if (filePathStats.isDirectory()) {
       continue;
     }
-    const name = filepath.split("/").pop()!.split(".")[0];
-    // console.log(`Loading ${path}/${filepath}`);
-    // skip non-JSON files
-    if (filepath.endsWith(".json")) {
-      jsonContents.set(name, await loadJsonFile(`${path}/${filepath}`));
+    const contents = await loadSwaggerFile(fullPath);
+    if (contents) {
+      jsonContents.set(filepath, contents);
+    }
+  }
+  if (jsonContents.size === 0) {
+    return undefined;
+  }
+  return jsonContents;
+}
+
+/**
+ * Attempts to compile TypeSpec in a given folder if no Swagger was found.
+ */
+async function compileTypespec(
+  path: string
+): Promise<Map<string, any> | undefined> {
+  // ensure there is a typespec file in the folder
+  const files = fs.readdirSync(path);
+  const typespecFiles = files.filter((file) => file.endsWith(".tsp"));
+  if (typespecFiles.length === 0) {
+    return undefined;
+  }
+  // run the typespec compiler
+  const command = `tsp compile ${path} --emit @azure-tools/typespec-autorest`;
+  const result = await new Promise((resolve, reject) => {
+    exec(command, (error: any, stdout: any, stderr: any) => {
+      if (error) {
+        console.error(error);
+        resolve(undefined);
+      }
+      resolve(stdout);
+    });
+  });
+  if (!result) {
+    return undefined;
+  }
+  // if successful, there should be a Swagger file in the folder,
+  // so attempt to reload.
+  return await loadFolder(path);
+}
+
+async function loadPaths(paths: string[]): Promise<Map<string, any>> {
+  let jsonContents = new Map<string, any>();
+  for (const path of paths) {
+    if (!validatePath(path)) {
+      throw new Error(`Invalid path ${path}`);
+    }
+    const stats = fs.statSync(path);
+    if (stats.isDirectory()) {
+      let values = await loadFolder(path);
+      const compileTsp = args["compile-tsp"];
+      if (!values) {
+        if (compileTsp) {
+          values = await compileTypespec(path);
+        } else {
+          throw new Error(`No Swagger files found: ${path}`);
+        }
+        if (!values) {
+          throw new Error(`No Swagger or TypeSpec files found: ${path}`);
+        }
+      }
+      jsonContents = new Map([...jsonContents, ...values]);
+    } else {
+      const contents = await loadSwaggerFile(path);
+      if (contents) {
+        jsonContents.set(path, contents);
+      }
     }
   }
   return jsonContents;
@@ -37,24 +139,16 @@ function validatePath(path: string): boolean {
     const stats = fs.statSync(path);
     return stats.isFile() || stats.isDirectory();
   } catch (error) {
-    throw new Error(`Invalid path: ${path}`);
+    return false;
   }
 }
 
-async function main(args: string[]) {
-  // TODO: Eliminate defaults
-  const in1 = args[2] ?? "KeyVaultOriginal";
-  const in2 = args[3] ?? "KeyVaultGenerated";
+async function main() {
+  const in1 = args.lhs;
+  const in2 = args.rhs;
 
-  // Ensure that input1 and input2 are provided
-  if (!in1 || !in2) {
-    console.error("error: Two inputs are required!");
-    console.error("error: npm start [A] [B]");
-    process.exit(1);
-  }
-
-  let leftParser = new SwaggerParser(await loadJsonContents(in1));
-  let rightParser = new SwaggerParser(await loadJsonContents(in2));
+  let leftParser = new SwaggerParser(await loadPaths(in1));
+  let rightParser = new SwaggerParser(await loadPaths(in2));
   let lhs = leftParser.asJSON();
   let rhs = rightParser.asJSON();
   // collect both error schemas
@@ -243,5 +337,3 @@ function processDiff(
   }
   return results;
 }
-
-await main(process.argv);

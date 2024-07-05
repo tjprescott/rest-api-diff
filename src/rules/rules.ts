@@ -3,7 +3,7 @@ import { ignoreSwaggerPropertiesRule } from "./ignore-swagger-properties.js";
 import { ignoreIrrelevantResponsePropertiesRule } from "./ignore-irrelevant-response-properties.js";
 import { ignoreXMsErrorCodeHeaderRule } from "./ignore-x-ms-error-code-header.js";
 import { ignoreApiVersionMinLengthRule } from "./ignore-api-version-min-length.js";
-import { OpenAPIV2, OpenAPIV3 } from "openapi-types";
+import { OpenAPIV2 } from "openapi-types";
 import { ignoreFormatUriRule } from "./ignore-format-uri.js";
 import { ignoreNextLinkFormatUriRule } from "./ignore-next-link-format-uri.js";
 import { compareErrorsRule } from "./compare-errors.js";

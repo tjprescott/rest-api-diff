@@ -39,15 +39,6 @@ function reportIncompatibilities(
       errors.push(`LHS has key '${path}' which is not in RHS`);
     }
   }
-  // ensure that lhsRequired has no properties not in rhsRequired
-  for (const key of lhsRequired) {
-    if (!rhsRequired.includes(key)) {
-      const path = prefix ? `${prefix}.${key}` : key;
-      errors.push(
-        `LHS has required key '${path}' which is not required in RHS`
-      );
-    }
-  }
   for (const key of lhsKeys) {
     errors.push(
       ...reportIncompatibilities(

@@ -12,9 +12,13 @@ against the one generated from TypeSpec to determine if the TypeSpec accurately 
 ## Usage
 
 1. Run `npm run build`
-2. Run `npm run diff <lhs_path> <rhs_path>`
+2. Run `npm run diff -- --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp]`
 
-`lhs_path` and `rhs_path` are the paths to the OpenAPI 2.0 specifications to compare, or the folders containing them.
+`lhs_path` and `rhs_path` are the paths to the OpenAPI 2.0 specifications (Swagger) to compare,
+or the folders containing them. If the paths are folders, the tool will recursively search for all
+Swagger files in the folder. If no Swagger files are found, but TypeSpec files are found and the
+`--compile-tsp` flag it set, the tool will attempt to compile the TypeSpec files to Swagger using
+the `@azure-tools/autorest` emitter.
 
 ## Output
 
