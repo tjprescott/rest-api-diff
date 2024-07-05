@@ -37,6 +37,11 @@ const args = await yargs(hideBin(process.argv))
     describe:
       "Group violations by rule name. If false, will output all violations in a flat collection.",
   })
+  .options("output-folder", {
+    type: "string",
+    default: "./output",
+    describe: "The folder to output artifacts to.",
+  })
   .parse();
 
 await main();
@@ -169,11 +174,24 @@ async function main() {
   // process the rules to filter out any irrelevant differences
   const differences = processDiff(diff(lhs, rhs), lhs, rhs, errorsSchemas);
 
+  // ensure the output folder exists and is empty
+  const outputFolder = args["output-folder"];
+  if (!fs.existsSync(outputFolder)) {
+    fs.mkdirSync(outputFolder);
+  } else {
+    const files = fs.readdirSync(outputFolder);
+    for (const file of files) {
+      fs.unlinkSync(`${outputFolder}/${file}`);
+    }
+  }
+
   // prune the documents of any paths that are not relevant and
   // output them for visual diffing.
   [lhs, rhs] = pruneDocuments(lhs, rhs, differences?.noViolations);
-  fs.writeFileSync("lhs.json", JSON.stringify(lhs, null, 2));
-  fs.writeFileSync("rhs.json", JSON.stringify(rhs, null, 2));
+  const lhsPath = `${args["output-folder"]}/lhs.json`;
+  const rhsPath = `${args["output-folder"]}/rhs.json`;
+  fs.writeFileSync(lhsPath, JSON.stringify(lhs, null, 2));
+  fs.writeFileSync(rhsPath, JSON.stringify(rhs, null, 2));
 
   const groupViolations = args["group-violations"];
   const flaggedViolations = differences?.flaggedViolations ?? [];
@@ -209,13 +227,13 @@ async function writeGroupedViolations(differences: DiffItem[]) {
   console.warn(
     `Found ${ruleViolationCount} violations across ${Object.keys(groupedDiff).length - 1} rules, with ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
   );
-  // flatten the map into an object where the keys are the rule names and the values are the arrays of diffs
-
-  fs.writeFileSync("diff.json", JSON.stringify(groupedDiff, null, 2));
+  const diffPath = `${args["output-folder"]}/diff.json`;
+  fs.writeFileSync(diffPath, JSON.stringify(groupedDiff, null, 2));
 }
 
 async function writeFlatViolations(differences: DiffItem[]) {
-  fs.writeFileSync("diff.json", JSON.stringify(differences, null, 2));
+  const diffPath = `${args["output-folder"]}/diff.json`;
+  fs.writeFileSync(diffPath, JSON.stringify(differences, null, 2));
 }
 
 /** Deletes a specified path from a given OpenAPI document. */

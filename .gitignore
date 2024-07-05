@@ -1,5 +1,3 @@
 node_modules/
 dist/
-lhs.json
-rhs.json
-diff.json
+output/

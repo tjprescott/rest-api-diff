@@ -25,6 +25,8 @@ but will not search subfolders.
   `@azure-tools/autorest` emitter, if no Swagger files are found.
 - `--group-violations`: The tool will group violations by rule within `diff.json`, rather than
   listing them as a flat collection.
+- `--output-folder`: The folder to write the output files to. If not specified, the output will be
+  written to `./output`. The output folder is cleared with each run.
 
 ## Output
 
