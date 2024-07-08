@@ -171,8 +171,14 @@ async function main() {
     errorsSchemas.set(name, value as OpenAPIV2.Schema);
   }
 
-  // process the rules to filter out any irrelevant differences
-  const differences = processDiff(diff(lhs, rhs), lhs, rhs, errorsSchemas);
+  // sort the diffs into three buckets: flagged violations, assumed violations, and no violations
+  const results = processDiff(diff(lhs, rhs), lhs, rhs, errorsSchemas);
+  if (!results) {
+    throw new Error("Error occurred while processing diffs.");
+  }
+  const flaggedViolations = results.flaggedViolations ?? [];
+  const assumedViolations = results.assumedViolations ?? [];
+  const allViolations = [...flaggedViolations, ...assumedViolations];
 
   // ensure the output folder exists and is empty
   const outputFolder = args["output-folder"];
@@ -185,34 +191,54 @@ async function main() {
     }
   }
 
+  // create inverse files that show only the stuff that has been pruned
+  // for diagnostic purposes.
+  const [lhsInv, rhsInv] = pruneDocuments(lhs, rhs, allViolations);
+  fs.writeFileSync(
+    `${args["output-folder"]}/lhs-inv.json`,
+    JSON.stringify(lhsInv, null, 2)
+  );
+  fs.writeFileSync(
+    `${args["output-folder"]}/rhs-inv.json`,
+    JSON.stringify(rhsInv, null, 2)
+  );
+
   // prune the documents of any paths that are not relevant and
   // output them for visual diffing.
-  [lhs, rhs] = pruneDocuments(lhs, rhs, differences?.noViolations);
-  const lhsPath = `${args["output-folder"]}/lhs.json`;
-  const rhsPath = `${args["output-folder"]}/rhs.json`;
-  fs.writeFileSync(lhsPath, JSON.stringify(lhs, null, 2));
-  fs.writeFileSync(rhsPath, JSON.stringify(rhs, null, 2));
+  [lhs, rhs] = pruneDocuments(lhs, rhs, results.noViolations);
+  fs.writeFileSync(
+    `${args["output-folder"]}/lhs.json`,
+    JSON.stringify(lhs, null, 2)
+  );
+  fs.writeFileSync(
+    `${args["output-folder"]}/rhs.json`,
+    JSON.stringify(rhs, null, 2)
+  );
 
   const groupViolations = args["group-violations"];
-  const flaggedViolations = differences?.flaggedViolations ?? [];
-  const assumedViolations = differences?.assumedViolations ?? [];
-  const allViolations = [...flaggedViolations, ...assumedViolations];
   if (allViolations.length === 0) {
     console.log("No differences found");
     return 0;
   }
   // write out the diff.json file based on the grouping preference
+  const normalFilename = "diff.json";
+  const inverseFilename = "diff-inv.json";
   if (groupViolations) {
-    writeGroupedViolations(allViolations);
+    writeGroupedViolations(allViolations, normalFilename);
+    writeGroupedViolations(results.noViolations, inverseFilename);
   } else {
     console.warn(
       `Found ${flaggedViolations.length} flagged violations and ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
     );
-    writeFlatViolations(allViolations);
+    writeFlatViolations(allViolations, normalFilename);
+    writeFlatViolations(results.noViolations, inverseFilename);
   }
 }
 
-async function writeGroupedViolations(differences: DiffItem[]) {
+async function writeGroupedViolations(
+  differences: DiffItem[],
+  filename: string
+) {
   const defaultRule = "assumedViolation";
   const groupedDiff: { [key: string]: DiffItem[] } = {};
   for (const diff of differences) {
@@ -227,12 +253,12 @@ async function writeGroupedViolations(differences: DiffItem[]) {
   console.warn(
     `Found ${ruleViolationCount} violations across ${Object.keys(groupedDiff).length - 1} rules, with ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
   );
-  const diffPath = `${args["output-folder"]}/diff.json`;
+  const diffPath = `${args["output-folder"]}/${filename}`;
   fs.writeFileSync(diffPath, JSON.stringify(groupedDiff, null, 2));
 }
 
-async function writeFlatViolations(differences: DiffItem[]) {
-  const diffPath = `${args["output-folder"]}/diff.json`;
+async function writeFlatViolations(differences: DiffItem[], filename: string) {
+  const diffPath = `${args["output-folder"]}/${filename}`;
   fs.writeFileSync(diffPath, JSON.stringify(differences, null, 2));
 }
 

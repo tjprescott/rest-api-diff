@@ -52,6 +52,16 @@ The schema of the diff object:
   - `lhs`: The value of the node in the left-hand side document, if applicable.
   - `rhs`: The value of the node in the right-hand side document, if applicable.
 
+For diagnostic purposes, the tool will also output the following "inverse" files:
+
+- `lhs-inv.json` the transformed API with the violations pruned for the left-hand side. Lets you see only the diffs that were considered "non-violations".
+- `rhs-inv.json` the transformed API with the violations pruned for the right-hand side. Lets you see only the diffs that were considered "non-violations".
+- `diff-inv.json` the list of diff items between the two specifications that were considered "non-violations".
+
+A visual diff of `lhs-inv.json` and `rhs-inv.json` will show you only the differences that the tool considered "non-violations" or irrelevant. `diff-inv.json` will
+also tell you which rule was applied that rendered the diff as a "non-violation". These can be useful to validate the rule logic and ensure it is not letting
+actually violations sneak through.
+
 ## Rules
 
 The way `openapi-diff` works is by expanding references (except circular references) into inline definitions, combining multiple
