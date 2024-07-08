@@ -160,8 +160,8 @@ async function main() {
 
   let leftParser = new SwaggerParser(await loadPaths(in1));
   let rightParser = new SwaggerParser(await loadPaths(in2));
-  let lhs = leftParser.asJSON();
-  let rhs = rightParser.asJSON();
+  const lhs = leftParser.asJSON();
+  const rhs = rightParser.asJSON();
   // collect both error schemas
   const errorsSchemas = new Map<string, OpenAPIV2.SchemaObject>();
   for (const [name, value] of Object.entries(lhs.definitions ?? {})) {
@@ -205,14 +205,14 @@ async function main() {
 
   // prune the documents of any paths that are not relevant and
   // output them for visual diffing.
-  [lhs, rhs] = pruneDocuments(lhs, rhs, results.noViolations);
+  const [lhsNew, rhsNew] = pruneDocuments(lhs, rhs, results.noViolations);
   fs.writeFileSync(
     `${args["output-folder"]}/lhs.json`,
-    JSON.stringify(lhs, null, 2)
+    JSON.stringify(lhsNew, null, 2)
   );
   fs.writeFileSync(
     `${args["output-folder"]}/rhs.json`,
-    JSON.stringify(rhs, null, 2)
+    JSON.stringify(rhsNew, null, 2)
   );
 
   const groupViolations = args["group-violations"];
@@ -224,20 +224,21 @@ async function main() {
   const normalFilename = "diff.json";
   const inverseFilename = "diff-inv.json";
   if (groupViolations) {
-    writeGroupedViolations(allViolations, normalFilename);
-    writeGroupedViolations(results.noViolations, inverseFilename);
+    writeGroupedViolations(allViolations, normalFilename, true);
+    writeGroupedViolations(results.noViolations, inverseFilename, false);
   } else {
     console.warn(
       `Found ${flaggedViolations.length} flagged violations and ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
     );
-    writeFlatViolations(allViolations, normalFilename);
-    writeFlatViolations(results.noViolations, inverseFilename);
+    writeFlatViolations(allViolations, normalFilename, true);
+    writeFlatViolations(results.noViolations, inverseFilename, false);
   }
 }
 
 async function writeGroupedViolations(
   differences: DiffItem[],
-  filename: string
+  filename: string,
+  showWarning: boolean
 ) {
   const defaultRule = "assumedViolation";
   const groupedDiff: { [key: string]: DiffItem[] } = {};
@@ -250,14 +251,20 @@ async function writeGroupedViolations(
   }
   const assumedViolations = groupedDiff[defaultRule] ?? [];
   const ruleViolationCount = differences.length - assumedViolations.length;
-  console.warn(
-    `Found ${ruleViolationCount} violations across ${Object.keys(groupedDiff).length - 1} rules, with ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
-  );
+  if (showWarning) {
+    console.warn(
+      `Found ${ruleViolationCount} violations across ${Object.keys(groupedDiff).length - 1} rules, with ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
+    );
+  }
   const diffPath = `${args["output-folder"]}/${filename}`;
   fs.writeFileSync(diffPath, JSON.stringify(groupedDiff, null, 2));
 }
 
-async function writeFlatViolations(differences: DiffItem[], filename: string) {
+async function writeFlatViolations(
+  differences: DiffItem[],
+  filename: string,
+  showWarning: boolean
+) {
   const diffPath = `${args["output-folder"]}/${filename}`;
   fs.writeFileSync(diffPath, JSON.stringify(differences, null, 2));
 }
@@ -291,8 +298,10 @@ function pruneDocuments(
   inputRhs: OpenAPIV2.Document,
   differences: DiffItem[] | undefined
 ): [OpenAPIV2.Document, OpenAPIV2.Document] {
-  let lhs = inputLhs;
-  let rhs = inputRhs;
+  // deep copy the documents
+  let lhs = JSON.parse(JSON.stringify(inputLhs)) as OpenAPIV2.Document;
+  let rhs = JSON.parse(JSON.stringify(inputRhs)) as OpenAPIV2.Document;
+
   for (const diff of differences ?? []) {
     const path = diff.diff.path;
     if (!path) continue;
