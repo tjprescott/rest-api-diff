@@ -28,6 +28,17 @@ but will not search subfolders.
 - `--output-folder`: The folder to write the output files to. If not specified, the output will be
   written to `./output`. The output folder is cleared with each run.
 
+### .env File
+
+You can also specify environment variables for all options and/or use a .env file. Example
+
+```
+LHS="KeyVaultOriginal/common.json KeyVaultOriginal/secrets.json"
+RHS="KeyVaultGenerated"
+COMPILE_TSP="true"
+GROUP_VIOLATIONS="true"
+```
+
 ## Output
 
 The output artifacts are:

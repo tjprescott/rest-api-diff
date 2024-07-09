@@ -7,6 +7,9 @@ import { hideBin } from "yargs/helpers";
 const { diff } = pkg;
 import { OpenAPIV2 } from "openapi-types";
 import { exec } from "child_process";
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 const args = await yargs(hideBin(process.argv))
   .usage("Usage: $0 --lhs [path...] --rhs [path...]")
@@ -17,6 +20,7 @@ const args = await yargs(hideBin(process.argv))
     describe:
       "The files that are the basis for comparison. Can be an array of files or directories. Directories will be crawled for JSON files. Non-Swagger files will be ignored.",
     coerce: (arg) => arg.map(String),
+    default: process.env.LHS ? process.env.LHS.split(" ") : undefined,
   })
   .options("rhs", {
     type: "array",
@@ -24,23 +28,24 @@ const args = await yargs(hideBin(process.argv))
     describe:
       "The files to compare against. Can be an array of files or directories. Directories will be crawled for JSON files. Non-Swagger files will be ignored.",
     coerce: (arg) => arg.map(String),
+    default: process.env.RHS ? process.env.RHS.split(" ") : undefined,
   })
   .options("compile-tsp", {
     type: "boolean",
-    default: false,
     describe:
       "If TypeSpec files are found but no Swagger files, will attempt to compile the TypeSpec to Swagger and use that.",
+    default: process.env.COMPILE_TSP === "true",
   })
   .options("group-violations", {
     type: "boolean",
-    default: false,
     describe:
       "Group violations by rule name. If false, will output all violations in a flat collection.",
+    default: process.env.GROUP_VIOLATIONS === "true",
   })
   .options("output-folder", {
     type: "string",
-    default: "./output",
     describe: "The folder to output artifacts to.",
+    default: process.env.OUTPUT_FOLDER ?? "./output",
   })
   .parse();
 
