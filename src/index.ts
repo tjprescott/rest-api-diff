@@ -33,7 +33,7 @@ const args = await yargs(hideBin(process.argv))
   .options("compile-tsp", {
     type: "boolean",
     describe:
-      "If TypeSpec files are found but no Swagger files, will attempt to compile the TypeSpec to Swagger and use that.",
+      "If TypeSpec files are found, attempt to compile the TypeSpec to Swagger using @typespec-autorest.",
     default: process.env.COMPILE_TSP === "true",
   })
   .options("group-violations", {
@@ -128,16 +128,15 @@ async function loadPaths(paths: string[]): Promise<Map<string, any>> {
     const stats = fs.statSync(path);
     if (stats.isDirectory()) {
       let values = await loadFolder(path);
+      // if compile-tsp is set, always attempt to compile TypeSpec files.
       const compileTsp = args["compile-tsp"];
-      if (!values) {
-        if (compileTsp) {
-          values = await compileTypespec(path);
-        } else {
-          throw new Error(`No Swagger files found: ${path}`);
-        }
+      if (compileTsp) {
+        values = await compileTypespec(path);
         if (!values) {
           throw new Error(`No Swagger or TypeSpec files found: ${path}`);
         }
+      } else if (!values) {
+        throw new Error(`No Swagger files found: ${path}`);
       }
       jsonContents = new Map([...jsonContents, ...values]);
     } else {

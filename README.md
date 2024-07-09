@@ -22,7 +22,8 @@ but will not search subfolders.
 ### Options
 
 - `--compile-tsp`: The tool will attempt to compile TypeSpec files to Swagger using the
-  `@azure-tools/autorest` emitter, if no Swagger files are found.
+  `@azure-tools/autorest` emitter. If existing Swagger files are found, they will be overwritten
+  by the compilation.
 - `--group-violations`: The tool will group violations by rule within `diff.json`, rather than
   listing them as a flat collection.
 - `--output-folder`: The folder to write the output files to. If not specified, the output will be
