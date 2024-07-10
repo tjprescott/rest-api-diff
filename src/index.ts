@@ -107,6 +107,7 @@ async function compileTypespec(
       if (error) {
         throw new Error(`${stdout}\nError occurred while compiling TypeSpec!`);
       }
+      console.log(stdout);
       resolve(stdout);
     });
   });
