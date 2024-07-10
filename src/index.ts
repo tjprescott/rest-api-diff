@@ -105,8 +105,7 @@ async function compileTypespec(
   const result = await new Promise((resolve, reject) => {
     exec(command, (error: any, stdout: any, stderr: any) => {
       if (error) {
-        console.error(error);
-        resolve(undefined);
+        throw new Error(`${stdout}\nError occurred while compiling TypeSpec!`);
       }
       resolve(stdout);
     });
