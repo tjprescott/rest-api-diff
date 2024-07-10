@@ -31,6 +31,8 @@ but will not search subfolders.
 - `--typespec-compiler-path`: The path to the `@typespec/compiler` package. If not specified, the
   tool will attempt to use the globally installed package. If you get "compiler mismatch" errors,
   try configuring this.
+- `--typespec-version-selector`: This is used for multiversioned TypeSpec files to select the version
+  you want to generate Swagger for. If omitted, the latest version will be generated.
 
 ### .env File
 
@@ -42,6 +44,7 @@ RHS="KeyVaultGenerated"
 COMPILE_TSP="true"
 GROUP_VIOLATIONS="true"
 TYPESPEC_COMPILER_PATH="<PATH_TO_SPECS_REPO>/node_modules/@typespec/compiler"
+TYPESPEC_VERSION_SELECTOR="2021-06-01"
 ```
 
 ## Output

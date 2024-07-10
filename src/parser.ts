@@ -70,6 +70,14 @@ export class SwaggerParser {
     delete obj["produces"];
     delete obj["host"];
 
+    const paths = obj["paths"] ?? {};
+    const xMsPaths = obj["x-ms-paths"] ?? {};
+    delete obj["paths"];
+    delete obj["x-ms-paths"];
+
+    const allPaths = { ...paths, ...xMsPaths };
+    result["paths"] = this.parsePaths(allPaths);
+
     for (const [key, val] of Object.entries(obj)) {
       switch (key) {
         case "swagger":
@@ -87,9 +95,6 @@ export class SwaggerParser {
         case "tags":
         case "externalDocs":
           result[key] = this.parse(val);
-          break;
-        case "paths":
-          result[key] = this.parsePaths(val);
           break;
         default:
           throw new Error(`Unhandled root key: ${key}`);

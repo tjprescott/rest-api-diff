@@ -11,6 +11,8 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+const typespecOutputDir = `${process.cwd()}/tsp-output`;
+
 const args = await yargs(hideBin(process.argv))
   .usage("Usage: $0 --lhs [path...] --rhs [path...]")
   .demandOption(["lhs", "rhs"])
@@ -52,6 +54,12 @@ const args = await yargs(hideBin(process.argv))
     describe:
       "The path to the TypeSpec compiler. If not provided, will use the globally installed compiler.",
     default: process.env.TYPESPEC_COMPILER_PATH,
+  })
+  .options("typespec-version-selector", {
+    type: "string",
+    describe:
+      "For multiversion TypeSpec files, the version to generate Swagger for.",
+    default: process.env.TYPESPEC_VERSION_SELECTOR,
   })
   .parse();
 
@@ -111,7 +119,15 @@ async function compileTypespec(
   const tspCommand = compilerPath
     ? `node ${compilerPath}/entrypoints/cli.js`
     : "tsp";
-  const command = `${tspCommand} compile ${path} --emit @azure-tools/typespec-autorest`;
+  const options = [
+    `--option=@azure-tools/typespec-autorest.emitter-output-dir=${typespecOutputDir}`,
+    `--option=@azure-tools/typespec-autorest.output-file=openapi.json`,
+  ];
+  if (args["typespec-version-selector"]) {
+    const version = args["typespec-version-selector"];
+    options.push(`--option=@azure-tools/typespec-autorest.version=${version}`);
+  }
+  const command = `${tspCommand} compile ${path} --emit=@azure-tools/typespec-autorest ${options.join(" ")}`;
   const result = await new Promise((resolve, reject) => {
     console.log(`Running: ${command}`);
     exec(command, (error: any, stdout: any, stderr: any) => {
@@ -130,7 +146,7 @@ async function compileTypespec(
   }
   // if successful, there should be a Swagger file in the folder,
   // so attempt to reload.
-  return await loadFolder(path);
+  return await loadFolder(typespecOutputDir);
 }
 
 async function loadPaths(paths: string[]): Promise<Map<string, any>> {
@@ -416,10 +432,7 @@ function processDiff(
   lhs: OpenAPIV2.Document,
   rhs: OpenAPIV2.Document,
   errorsSchemas: Map<string, OpenAPIV2.SchemaObject>
-): DiffResult | undefined {
-  if (!differences) {
-    return undefined;
-  }
+): DiffResult {
   const results: DiffResult = {
     flaggedViolations: [],
     assumedViolations: [],
