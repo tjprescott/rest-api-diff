@@ -47,6 +47,12 @@ const args = await yargs(hideBin(process.argv))
     describe: "The folder to output artifacts to.",
     default: process.env.OUTPUT_FOLDER ?? "./output",
   })
+  .options("typespec-compiler-path", {
+    type: "string",
+    describe:
+      "The path to the TypeSpec compiler. If not provided, will use the globally installed compiler.",
+    default: process.env.TYPESPEC_COMPILER_PATH,
+  })
   .parse();
 
 await main();
@@ -101,11 +107,19 @@ async function compileTypespec(
     return undefined;
   }
   // run the typespec compiler
-  const command = `tsp compile ${path} --emit @azure-tools/typespec-autorest`;
+  const compilerPath = process.env.TYPESPEC_COMPILER_PATH;
+  const tspCommand = compilerPath
+    ? `node ${compilerPath}/entrypoints/cli.js`
+    : "tsp";
+  const command = `${tspCommand} compile ${path} --emit @azure-tools/typespec-autorest`;
   const result = await new Promise((resolve, reject) => {
+    console.log(`Running: ${command}`);
     exec(command, (error: any, stdout: any, stderr: any) => {
       if (error) {
-        throw new Error(`${stdout}\nError occurred while compiling TypeSpec!`);
+        const errMessage = stdout === "" ? error : stdout;
+        throw new Error(
+          `${errMessage}\nError occurred while compiling TypeSpec!`
+        );
       }
       console.log(stdout);
       resolve(stdout);

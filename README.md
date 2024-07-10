@@ -28,6 +28,9 @@ but will not search subfolders.
   listing them as a flat collection.
 - `--output-folder`: The folder to write the output files to. If not specified, the output will be
   written to `./output`. The output folder is cleared with each run.
+- `--typespec-compiler-path`: The path to the `@typespec/compiler` package. If not specified, the
+  tool will attempt to use the globally installed package. If you get "compiler mismatch" errors,
+  try configuring this.
 
 ### .env File
 
@@ -38,6 +41,7 @@ LHS="KeyVaultOriginal/common.json KeyVaultOriginal/secrets.json"
 RHS="KeyVaultGenerated"
 COMPILE_TSP="true"
 GROUP_VIOLATIONS="true"
+TYPESPEC_COMPILER_PATH="<PATH_TO_SPECS_REPO>/node_modules/@typespec/compiler"
 ```
 
 ## Output
@@ -73,6 +77,12 @@ For diagnostic purposes, the tool will also output the following "inverse" files
 A visual diff of `lhs-inv.json` and `rhs-inv.json` will show you only the differences that the tool considered "non-violations" or irrelevant. `diff-inv.json` will
 also tell you which rule was applied that rendered the diff as a "non-violation". These can be useful to validate the rule logic and ensure it is not letting
 actually violations sneak through.
+
+## Running against the REST API Specs Repo
+
+1. Ensure you have updated the dependencies in your fork by running `npm install` in the REST API specs repo root. You may need to delete `package-lock.json` first. Copy the path to the `node_modules/@typespec/compiler` package.
+2. Set the `TYPESPEC_COMPILER_PATH` environment variable (ideally in .env) to the path you copied in step 1.
+3. Ensure that LHS and RHS point to the appropriate paths in the REST API specs repo.
 
 ## Rules
 
