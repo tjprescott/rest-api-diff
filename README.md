@@ -12,7 +12,7 @@ against the one generated from TypeSpec to determine if the TypeSpec accurately 
 
 ## Usage
 
-1. Run `npm run build`
+1. Run `npm run build` to build the tool. Alternatively, run `npm run watch` in a separate terminal so that changes to the TypeScript files are automatically re-compiled (RECOMMENDED).
 2. Run `npm run diff -- --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp] [--group-violations]`
 
 `lhs_path` and `rhs_path` are the paths to the Swagger specifications to compare, or the folders
