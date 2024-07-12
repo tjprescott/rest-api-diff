@@ -108,14 +108,16 @@ async function loadFolder(path: string): Promise<Map<string, any> | undefined> {
 async function compileTypespec(
   path: string
 ): Promise<Map<string, any> | undefined> {
-  // ensure there is a typespec file in the folder
-  const files = fs.readdirSync(path);
-  const typespecFiles = files.filter((file) => file.endsWith(".tsp"));
-  if (typespecFiles.length === 0) {
-    return undefined;
+  const compilerPath = args["typespec-compiler-path"];
+  const isDir = fs.statSync(path).isDirectory();
+  if (isDir) {
+    // ensure there is a typespec file in the folder
+    const files = fs.readdirSync(path);
+    const typespecFiles = files.filter((file) => file.endsWith(".tsp"));
+    if (typespecFiles.length === 0) {
+      return undefined;
+    }
   }
-  // run the typespec compiler
-  const compilerPath = process.env.TYPESPEC_COMPILER_PATH;
   const tspCommand = compilerPath
     ? `node ${compilerPath}/entrypoints/cli.js`
     : "tsp";
@@ -150,6 +152,7 @@ async function compileTypespec(
 }
 
 async function loadPaths(paths: string[]): Promise<Map<string, any>> {
+  const compileTsp = args["compile-tsp"];
   let jsonContents = new Map<string, any>();
   for (const path of paths) {
     if (!validatePath(path)) {
@@ -157,22 +160,33 @@ async function loadPaths(paths: string[]): Promise<Map<string, any>> {
     }
     const stats = fs.statSync(path);
     if (stats.isDirectory()) {
-      let values = await loadFolder(path);
+      const swaggerValues = await loadFolder(path);
       // if compile-tsp is set, always attempt to compile TypeSpec files.
-      const compileTsp = args["compile-tsp"];
+      const typespecValues = compileTsp
+        ? await compileTypespec(path)
+        : undefined;
       if (compileTsp) {
-        values = await compileTypespec(path);
-        if (!values) {
+        if (!typespecValues && !swaggerValues) {
           throw new Error(`No Swagger or TypeSpec files found: ${path}`);
         }
-      } else if (!values) {
+        return (typespecValues ?? swaggerValues)!;
+      } else if (!swaggerValues) {
         throw new Error(`No Swagger files found: ${path}`);
       }
-      jsonContents = new Map([...jsonContents, ...values]);
+      return swaggerValues;
     } else {
-      const contents = await loadSwaggerFile(path);
+      let contents: Map<string, any> | undefined;
+      if (path.endsWith(".tsp") && compileTsp) {
+        contents = await compileTypespec(path);
+      } else if (path.endsWith(".json")) {
+        contents = await loadSwaggerFile(path);
+      } else {
+        throw new Error(`Unsupported file type: ${path}`);
+      }
       if (contents) {
         jsonContents.set(path, contents);
+      } else {
+        throw new Error(`No content in file: ${path}`);
       }
     }
   }

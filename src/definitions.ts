@@ -29,38 +29,41 @@ export class DefinitionRegistry {
   }
 
   #gatherReferences(map: Map<string, any>) {
-    // TODO: Need to ingest examples and common types
-    for (const [filename, data] of map.entries()) {
-      // Gather definitions
-      for (const [name, value] of Object.entries(data.definitions ?? {})) {
-        if (this.definitions.has(name)) {
-          throw new Error(`Duplicate definition: ${name}`);
+    try {
+      for (const [filename, data] of map.entries()) {
+        // Gather definitions
+        for (const [name, value] of Object.entries(data.definitions ?? {})) {
+          if (this.definitions.has(name)) {
+            throw new Error(`Duplicate definition: ${name}`);
+          }
+          this.definitions.set(name, this.parser.parse(value));
         }
-        this.definitions.set(name, this.parser.parse(value));
-      }
-      // Gather parameter definitions
-      for (const [name, value] of Object.entries(data.parameters ?? {})) {
-        if (this.parameters.has(name)) {
-          throw new Error(`Duplicate parameter: ${name}`);
+        // Gather parameter definitions
+        for (const [name, value] of Object.entries(data.parameters ?? {})) {
+          if (this.parameters.has(name)) {
+            throw new Error(`Duplicate parameter: ${name}`);
+          }
+          this.parameters.set(name, this.parser.parse(value));
         }
-        this.parameters.set(name, this.parser.parse(value));
-      }
-      // Gather responses
-      for (const [name, value] of Object.entries(data.responses ?? {})) {
-        if (this.responses.has(name)) {
-          throw new Error(`Duplicate response: ${name}`);
+        // Gather responses
+        for (const [name, value] of Object.entries(data.responses ?? {})) {
+          if (this.responses.has(name)) {
+            throw new Error(`Duplicate response: ${name}`);
+          }
+          this.responses.set(name, this.parser.parse(value));
         }
-        this.responses.set(name, this.parser.parse(value));
-      }
-      // Gather security definitions
-      for (const [name, value] of Object.entries(
-        data.securityDefinitions ?? {}
-      )) {
-        if (this.securityDefinitions.has(name)) {
-          throw new Error(`Duplicate security definition: ${name}`);
+        // Gather security definitions
+        for (const [name, value] of Object.entries(
+          data.securityDefinitions ?? {}
+        )) {
+          if (this.securityDefinitions.has(name)) {
+            throw new Error(`Duplicate security definition: ${name}`);
+          }
+          this.securityDefinitions.set(name, this.parser.parse(value));
         }
-        this.securityDefinitions.set(name, this.parser.parse(value));
       }
+    } catch (err) {
+      console.error(err);
     }
   }
 
