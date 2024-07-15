@@ -2,6 +2,7 @@ import * as crypto from "crypto";
 import { OpenAPI, OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
 import { ParameterizedHost } from "./extensions/parameterized-host.js";
+import * as fs from "fs";
 
 export interface ReferenceMetadata {
   name: string;
@@ -23,11 +24,29 @@ export class SwaggerParser {
     this.definitions = new DefinitionRegistry(map, this);
     this.definitions.initialize();
     for (const [_, data] of map.entries()) {
-      this.result = { ...this.result, ...this.parseRoot(data) };
+      this.#updateResult(this.parseRoot(data));
     }
     const unresolvedReferences = this.definitions.getUnresolvedReferences();
     if (unresolvedReferences.length > 0) {
       console.warn(`Unresolved references: ${unresolvedReferences.join(", ")}`);
+    }
+  }
+
+  /** Merge the top-level Swagger keys */
+  #updateResult(values: any) {
+    const updatableKeys = [
+      "paths",
+      "definitions",
+      "parameters",
+      "responses",
+      "securityDefinitions",
+    ];
+    for (const [key, value] of Object.entries(values)) {
+      if (updatableKeys.includes(key)) {
+        const existing = (this.result as any)[key] ?? {};
+        (this.result as any)[key] = { ...existing, ...(value as any) };
+        let test = "best";
+      }
     }
   }
 
@@ -284,8 +303,11 @@ export class SwaggerParser {
     if (!match) {
       return undefined;
     }
+    const path = match[1];
+    const section = match[2];
+    const name = match[3];
     let registry: RegistryKind;
-    switch (match[2]) {
+    switch (section) {
       case "definitions":
         registry = RegistryKind.Definition;
         break;
@@ -299,12 +321,12 @@ export class SwaggerParser {
         registry = RegistryKind.SecurityDefinition;
         break;
       default:
-        throw new Error(`Unknown registry: ${match[2]}`);
+        throw new Error(`Unknown registry: ${section}`);
     }
     return {
-      filePath: match[1],
+      filePath: path,
       registry: registry,
-      name: match[3],
+      name: name,
     };
   }
 

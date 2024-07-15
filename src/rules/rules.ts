@@ -27,8 +27,7 @@ export enum RuleResult {
 export type RuleSignature = (
   data: Diff<any, any>,
   lhs?: OpenAPIV2.Document,
-  rhs?: OpenAPIV2.Document,
-  errorSchemas?: Map<string, OpenAPIV2.SchemaObject>
+  rhs?: OpenAPIV2.Document
 ) => RuleResult | [RuleResult, string];
 
 /**

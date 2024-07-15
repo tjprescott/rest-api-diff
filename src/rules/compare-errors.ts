@@ -57,15 +57,14 @@ function reportIncompatibilities(
 export function compareErrorsRule(
   data: Diff<any, any>,
   lhs?: OpenAPIV2.Document,
-  rhs?: OpenAPIV2.Document,
-  errorSchemas?: Map<string, OpenAPIV2.SchemaObject>
+  rhs?: OpenAPIV2.Document
 ): RuleResult | [result: RuleResult, message: string] {
   if (!data.path) return RuleResult.ContinueProcessing;
   if (data.kind !== "E") return RuleResult.ContinueProcessing;
   const lastPath = data.path[data.path.length - 1];
   if (lastPath !== "$error") return RuleResult.ContinueProcessing;
-  const lhsError = errorSchemas?.get(data.lhs);
-  const rhsError = errorSchemas?.get(data.rhs);
+  const lhsError = (lhs?.definitions as any)?.[data.lhs];
+  const rhsError = (rhs?.definitions as any)?.[data.rhs];
   const errors = reportIncompatibilities(lhsError, rhsError);
   if (errors.length === 0) {
     return RuleResult.NoViolation;

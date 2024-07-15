@@ -151,43 +151,52 @@ async function compileTypespec(
   return await loadFolder(typespecOutputDir);
 }
 
-async function loadPaths(paths: string[]): Promise<Map<string, any>> {
+async function loadFolderContents(path: string): Promise<Map<string, any>> {
   const compileTsp = args["compile-tsp"];
+  const swaggerValues = await loadFolder(path);
+  // if compile-tsp is set, always attempt to compile TypeSpec files.
+  const typespecValues = compileTsp ? await compileTypespec(path) : undefined;
+  if (compileTsp) {
+    if (!typespecValues && !swaggerValues) {
+      throw new Error(`No Swagger or TypeSpec files found: ${path}`);
+    }
+    return (typespecValues ?? swaggerValues)!;
+  } else {
+    if (!swaggerValues) {
+      throw new Error(`No Swagger files found: ${path}`);
+    }
+    return swaggerValues;
+  }
+}
+
+async function loadFile(path: string): Promise<Map<string, any>> {
+  let contents = new Map<string, any>();
+  const compileTsp = args["compile-tsp"];
+  if (path.endsWith(".tsp") && compileTsp) {
+    contents = { ...contents, ...(await compileTypespec(path)) };
+  } else if (path.endsWith(".json")) {
+    contents.set(path, await loadSwaggerFile(path));
+  } else {
+    throw new Error(`Unsupported file type: ${path}`);
+  }
+  if (contents.size === 0) {
+    throw new Error(`No content in file: ${path}`);
+  }
+  return contents;
+}
+
+async function loadPaths(paths: string[]): Promise<Map<string, any>> {
   let jsonContents = new Map<string, any>();
   for (const path of paths) {
     if (!validatePath(path)) {
       throw new Error(`Invalid path ${path}`);
     }
     const stats = fs.statSync(path);
-    if (stats.isDirectory()) {
-      const swaggerValues = await loadFolder(path);
-      // if compile-tsp is set, always attempt to compile TypeSpec files.
-      const typespecValues = compileTsp
-        ? await compileTypespec(path)
-        : undefined;
-      if (compileTsp) {
-        if (!typespecValues && !swaggerValues) {
-          throw new Error(`No Swagger or TypeSpec files found: ${path}`);
-        }
-        return (typespecValues ?? swaggerValues)!;
-      } else if (!swaggerValues) {
-        throw new Error(`No Swagger files found: ${path}`);
-      }
-      return swaggerValues;
-    } else {
-      let contents: Map<string, any> | undefined;
-      if (path.endsWith(".tsp") && compileTsp) {
-        contents = await compileTypespec(path);
-      } else if (path.endsWith(".json")) {
-        contents = await loadSwaggerFile(path);
-      } else {
-        throw new Error(`Unsupported file type: ${path}`);
-      }
-      if (contents) {
-        jsonContents.set(path, contents);
-      } else {
-        throw new Error(`No content in file: ${path}`);
-      }
+    const values = stats.isDirectory()
+      ? await loadFolderContents(path)
+      : await loadFile(path);
+    for (const [key, value] of values.entries()) {
+      jsonContents.set(key, value);
     }
   }
   return jsonContents;
@@ -210,17 +219,9 @@ async function main() {
   let rightParser = new SwaggerParser(await loadPaths(in2));
   const lhs = leftParser.asJSON();
   const rhs = rightParser.asJSON();
-  // collect both error schemas
-  const errorsSchemas = new Map<string, OpenAPIV2.SchemaObject>();
-  for (const [name, value] of Object.entries(lhs.definitions ?? {})) {
-    errorsSchemas.set(name, value as OpenAPIV2.SchemaObject);
-  }
-  for (const [name, value] of Object.entries(rhs.definitions ?? {})) {
-    errorsSchemas.set(name, value as OpenAPIV2.Schema);
-  }
 
   // sort the diffs into three buckets: flagged violations, assumed violations, and no violations
-  const results = processDiff(diff(lhs, rhs), lhs, rhs, errorsSchemas);
+  const results = processDiff(diff(lhs, rhs), lhs, rhs);
   if (!results) {
     throw new Error("Error occurred while processing diffs.");
   }
@@ -402,8 +403,7 @@ function isFilterable(path: string[]): boolean {
 function processRules(
   data: Diff<any, any>,
   lhs: OpenAPIV2.Document,
-  rhs: OpenAPIV2.Document,
-  errorSchemas: Map<string, OpenAPIV2.SchemaObject>
+  rhs: OpenAPIV2.Document
 ): DiffItem {
   let retVal: any = {
     ruleResult: RuleResult.AssumedViolation,
@@ -411,7 +411,7 @@ function processRules(
     diff: data,
   };
   for (const rule of allRules) {
-    const result = rule(data, lhs, rhs, errorSchemas);
+    const result = rule(data, lhs, rhs);
     if (Array.isArray(result)) {
       retVal.ruleResult = result[0];
       retVal.ruleName = rule.name;
@@ -444,8 +444,7 @@ export interface DiffResult {
 function processDiff(
   differences: Diff<any, any>[] | undefined,
   lhs: OpenAPIV2.Document,
-  rhs: OpenAPIV2.Document,
-  errorsSchemas: Map<string, OpenAPIV2.SchemaObject>
+  rhs: OpenAPIV2.Document
 ): DiffResult {
   const results: DiffResult = {
     flaggedViolations: [],
@@ -454,7 +453,7 @@ function processDiff(
   };
   for (const data of differences ?? []) {
     if (!isFilterable(data.path!)) continue;
-    const result = processRules(data, lhs, rhs, errorsSchemas);
+    const result = processRules(data, lhs, rhs);
     switch (result.ruleResult) {
       case RuleResult.AssumedViolation:
         results.assumedViolations.push(result);
