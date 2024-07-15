@@ -11,6 +11,7 @@ import { flagTypeDifferencesRule } from "./flag-type-differences.js";
 import { compareXMsEnumRule } from "./compare-x-ms-enum.js";
 import { compareResponseRequiredRule } from "./compare-response-required.js";
 import { compareRequestRequiredRule } from "./compare-request-required.js";
+import { ignoreSwaggerDefintionsRule } from "./ignore-swagger-definitions.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -30,19 +31,25 @@ export type RuleSignature = (
   rhs?: OpenAPIV2.Document
 ) => RuleResult | [RuleResult, string];
 
-/**
- * Diff rules apply when evaluating the diff between two objects.
- */
-export const allRules: RuleSignature[] = [
-  ignoreSwaggerPropertiesRule,
-  ignoreIrrelevantResponsePropertiesRule,
-  ignoreXMsErrorCodeHeaderRule,
-  ignoreApiVersionMinLengthRule,
-  ignoreFormatUriRule,
-  ignoreNextLinkFormatUriRule,
-  compareErrorsRule,
-  compareXMsEnumRule,
-  flagTypeDifferencesRule,
-  compareResponseRequiredRule,
-  compareRequestRequiredRule,
-];
+/** Returns the list of rules that should be applied, modified by any options. */
+export function getApplicableRules(args: any): RuleSignature[] {
+  let rules = [
+    ignoreSwaggerPropertiesRule,
+    ignoreIrrelevantResponsePropertiesRule,
+    ignoreXMsErrorCodeHeaderRule,
+    ignoreApiVersionMinLengthRule,
+    ignoreFormatUriRule,
+    ignoreNextLinkFormatUriRule,
+    compareErrorsRule,
+    compareXMsEnumRule,
+    flagTypeDifferencesRule,
+    compareResponseRequiredRule,
+    compareRequestRequiredRule,
+  ];
+
+  const preserveDefinitions = args["preserve-definitions"];
+  if (!preserveDefinitions) {
+    rules.push(ignoreSwaggerDefintionsRule);
+  }
+  return rules;
+}

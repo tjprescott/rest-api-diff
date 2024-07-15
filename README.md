@@ -33,6 +33,11 @@ but will not search subfolders.
   try configuring this.
 - `--typespec-version-selector`: This is used for multiversioned TypeSpec files to select the version
   you want to generate Swagger for. If omitted, the latest version will be generated.
+- `--preserve-definitions`: The intended purpose of the tool is to determine if two REST APIs described
+  by Swagger are equivalent. Thus, Swagger definitions, parameters, responses, and security definitions,
+  which exist solely for code re-use, aren't relevant to that question unless those definitions are used
+  with a request or response. Hence, they are, by defult, pruned from the output. If you want to preserve
+  these, for example to compare the definitions themselves between two Swaggers, provide this flag.
 
 ### .env File
 
@@ -45,6 +50,7 @@ COMPILE_TSP="true"
 GROUP_VIOLATIONS="true"
 TYPESPEC_COMPILER_PATH="<PATH_TO_SPECS_REPO>/node_modules/@typespec/compiler"
 TYPESPEC_VERSION_SELECTOR="2021-06-01"
+PRESERVE_DEFINITIONS="false"
 ```
 
 ## Output

@@ -1,5 +1,5 @@
 import pkg, { Diff, DiffDeleted, DiffEdit, DiffNew } from "deep-diff";
-import { RuleResult, allRules } from "./rules/rules.js";
+import { getApplicableRules, RuleResult } from "./rules/rules.js";
 import * as fs from "fs";
 import { SwaggerParser } from "./parser.js";
 import yargs from "yargs";
@@ -60,6 +60,12 @@ const args = await yargs(hideBin(process.argv))
     describe:
       "For multiversion TypeSpec files, the version to generate Swagger for.",
     default: process.env.TYPESPEC_VERSION_SELECTOR,
+  })
+  .options("preserve-definitions", {
+    type: "boolean",
+    describe:
+      "Preserve defintions, parameters, responses, and securityDefinitions in the output. ",
+    default: process.env.PRESERVE_DEFINITIONS,
   })
   .parse();
 
@@ -354,7 +360,6 @@ function pruneDocuments(
   for (const diff of differences ?? []) {
     const path = diff.diff.path;
     if (!path) continue;
-    const lastPath = path[path.length - 1];
     if ((diff.diff as any).lhs !== undefined) {
       lhs = deletePath(lhs, path);
     }
@@ -362,16 +367,20 @@ function pruneDocuments(
       rhs = deletePath(rhs, path);
     }
   }
+
   // delete some standard collections from the documents
-  const keysToDelete = [
-    "definitions",
-    "parameters",
-    "responses",
-    "securityDefinitions",
-  ];
-  for (const key of keysToDelete) {
-    delete (lhs as any)[key];
-    delete (rhs as any)[key];
+  const preserveDefinitions = args["preserve-definitions"];
+  if (!preserveDefinitions) {
+    const keysToDelete = [
+      "definitions",
+      "parameters",
+      "responses",
+      "securityDefinitions",
+    ];
+    for (const key of keysToDelete) {
+      delete (lhs as any)[key];
+      delete (rhs as any)[key];
+    }
   }
   return [lhs, rhs];
 }
@@ -410,7 +419,8 @@ function processRules(
     ruleName: undefined,
     diff: data,
   };
-  for (const rule of allRules) {
+  const rules = getApplicableRules(args);
+  for (const rule of rules) {
     const result = rule(data, lhs, rhs);
     if (Array.isArray(result)) {
       retVal.ruleResult = result[0];

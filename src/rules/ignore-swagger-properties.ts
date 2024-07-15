@@ -2,16 +2,12 @@ import { Diff } from "deep-diff";
 import { RuleResult } from "./rules.js";
 
 const specificPathsToIgnore = [
-  "definitions",
   "externalDocs",
   "info.title",
   "info.description",
   "info.termsOfService",
   "info.contact",
   "info.x-typespec-generated",
-  "parameters",
-  "responses",
-  "securityDefinitions",
   "schemes",
 ];
 

@@ -45,7 +45,12 @@ export class SwaggerParser {
       if (updatableKeys.includes(key)) {
         const existing = (this.result as any)[key] ?? {};
         (this.result as any)[key] = { ...existing, ...(value as any) };
-        let test = "best";
+      } else {
+        const existing = (this.result as any)[key];
+        if (existing) {
+          continue;
+        }
+        (this.result as any)[key] = value;
       }
     }
   }
