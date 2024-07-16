@@ -1,4 +1,6 @@
+import { OpenAPIV2 } from "openapi-types";
 import { SwaggerParser } from "./parser.js";
+import { unescape } from "querystring";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {
@@ -8,19 +10,91 @@ export enum RegistryKind {
   SecurityDefinition,
 }
 
+export class CollectionRegistry {
+  private collection = new Map<string, any>();
+  private unreferenced = new Set<string>();
+  private unresolved = new Set<string>();
+
+  constructor(data: Map<string, any>, key: string) {
+    for (const [_, value] of data.entries()) {
+      const subdata = (value as any)[key];
+      if (subdata !== undefined) {
+        for (const [name, _] of Object.entries(subdata)) {
+          this.unreferenced.add(name);
+        }
+      }
+    }
+  }
+
+  /** Add or update an item. */
+  upsert(name: string, value: any) {
+    this.collection.set(name, value);
+  }
+
+  /** Add an item and error if already exists. */
+  insert(name: string, value: any) {
+    if (this.collection.has(name)) {
+      throw new Error(`Duplicate ${name}`);
+    }
+    this.collection.set(name, value);
+  }
+
+  /** Update an existing item and error if it doesn't exist. */
+  update(name: string, value: any) {
+    if (!this.collection.has(name)) {
+      throw new Error(`Not found: ${name}`);
+    }
+    this.collection.set(name, value);
+  }
+
+  /** Retrieve an item, if found. */
+  get(name: string): any | undefined {
+    return this.collection.get(name);
+  }
+
+  /** Mark an item as an unresolved reference. */
+  logUnresolved(name: string) {
+    this.unresolved.add(name);
+  }
+
+  /** Mark an item as referenced. */
+  countReference(name: string) {
+    if (this.unreferenced.has(name)) {
+      this.unreferenced.delete(name);
+    }
+  }
+
+  /** Resolve list of unreferenced objects. */
+  getUnreferenced(): string[] {
+    return Array.from(this.unreferenced);
+  }
+
+  /** Retrieve list of unresolved items. */
+  getUnresolved(): string[] {
+    return Array.from(this.unresolved);
+  }
+}
+
 /** A class which contains all defintions which can be referenced in a spec. */
 export class DefinitionRegistry {
   private parser: SwaggerParser;
-  private definitions = new Map<string, any>();
-  private parameters = new Map<string, any>();
-  private responses = new Map<string, any>();
-  private securityDefinitions = new Map<string, any>();
-  private unresolvedReferences = new Set<string>();
-  private swaggerMap: Map<string, any>;
+  public data: {
+    definitions: CollectionRegistry;
+    parameters: CollectionRegistry;
+    responses: CollectionRegistry;
+    securityDefinitions: CollectionRegistry;
+  };
+  private swaggerMap: Map<string, OpenAPIV2.Document>;
 
-  constructor(map: Map<string, any>, parser: SwaggerParser) {
+  constructor(map: Map<string, OpenAPIV2.Document>, parser: SwaggerParser) {
     this.parser = parser;
     this.swaggerMap = map;
+    this.data = {
+      definitions: new CollectionRegistry(map, "definitions"),
+      parameters: new CollectionRegistry(map, "parameters"),
+      responses: new CollectionRegistry(map, "responses"),
+      securityDefinitions: new CollectionRegistry(map, "securityDefinitions"),
+    };
   }
 
   initialize() {
@@ -29,99 +103,134 @@ export class DefinitionRegistry {
   }
 
   #gatherReferences(map: Map<string, any>) {
-    try {
-      for (const [filename, data] of map.entries()) {
-        // Gather definitions
-        for (const [name, value] of Object.entries(data.definitions ?? {})) {
-          if (this.definitions.has(name)) {
-            throw new Error(`Duplicate definition: ${name}`);
-          }
-          this.definitions.set(name, this.parser.parse(value));
-        }
-        // Gather parameter definitions
-        for (const [name, value] of Object.entries(data.parameters ?? {})) {
-          if (this.parameters.has(name)) {
-            throw new Error(`Duplicate parameter: ${name}`);
-          }
-          this.parameters.set(name, this.parser.parse(value));
-        }
-        // Gather responses
-        for (const [name, value] of Object.entries(data.responses ?? {})) {
-          if (this.responses.has(name)) {
-            throw new Error(`Duplicate response: ${name}`);
-          }
-          this.responses.set(name, this.parser.parse(value));
-        }
-        // Gather security definitions
-        for (const [name, value] of Object.entries(
-          data.securityDefinitions ?? {}
-        )) {
-          if (this.securityDefinitions.has(name)) {
-            throw new Error(`Duplicate security definition: ${name}`);
-          }
-          this.securityDefinitions.set(name, this.parser.parse(value));
-        }
-      }
-    } catch (err) {
-      console.error(err);
+    for (const [name, value] of Object.entries(this.data.definitions)) {
+      const expanded = this.parser.parse(value);
+      this.data.definitions.insert(name, expanded);
+    }
+    for (const [name, value] of Object.entries(this.data.parameters)) {
+      const expanded = this.parser.parse(value);
+      this.data.parameters.insert(name, expanded);
+    }
+    for (const [name, value] of Object.entries(this.data.responses)) {
+      const expanded = this.parser.parse(value);
+      this.data.responses.insert(name, expanded);
+    }
+    for (const [name, value] of Object.entries(this.data.securityDefinitions)) {
+      const expanded = this.parser.parse(value);
+      this.data.securityDefinitions.insert(name, expanded);
     }
   }
 
   #revisitReferences(map: Map<string, any>) {
     // Second path through should clear up any unresolved forward references.
     // It will NOT solve any circular references!
-    this.resetUnresolvedReferences();
-    for (const [name, value] of this.definitions.entries()) {
+    for (const [name, value] of Object.entries(this.data.definitions)) {
       const expanded = this.parser.parse(value);
-      this.definitions.set(name, expanded);
+      this.data.definitions.update(name, expanded);
     }
-    for (const [name, value] of this.parameters.entries()) {
+    for (const [name, value] of Object.entries(this.data.parameters)) {
       const expanded = this.parser.parse(value);
-      this.parameters.set(name, expanded);
+      this.data.parameters.update(name, expanded);
     }
-    for (const [name, value] of this.responses.entries()) {
+    for (const [name, value] of Object.entries(this.data.responses)) {
       const expanded = this.parser.parse(value);
-      this.responses.set(name, expanded);
+      this.data.responses.update(name, expanded);
     }
-    for (const [name, value] of this.securityDefinitions.entries()) {
+    for (const [name, value] of Object.entries(this.data.securityDefinitions)) {
       const expanded = this.parser.parse(value);
-      this.securityDefinitions.set(name, expanded);
+      this.data.securityDefinitions.update(name, expanded);
     }
   }
 
   /** Search a registry for a specific key. */
-  get(name: string, registry: RegistryKind): any | undefined {
+  get(name: string, registry?: RegistryKind): any | undefined {
+    if (registry === undefined) {
+      return undefined;
+    }
     switch (registry) {
       case RegistryKind.Definition:
-        return this.definitions.get(name);
+        return this.data.definitions.get(name);
       case RegistryKind.Parameter:
-        return this.parameters.get(name);
+        return this.data.parameters.get(name);
       case RegistryKind.Response:
-        return this.responses.get(name);
+        return this.data.responses.get(name);
       case RegistryKind.SecurityDefinition:
-        return this.securityDefinitions.get(name);
+        return this.data.securityDefinitions.get(name);
       default:
         return (
-          this.definitions.get(name) ??
-          this.parameters.get(name) ??
-          this.responses.get(name) ??
-          this.securityDefinitions.get(name)
+          this.data.definitions.get(name) ??
+          this.data.parameters.get(name) ??
+          this.data.responses.get(name) ??
+          this.data.securityDefinitions.get(name)
         );
     }
   }
 
-  /** Logs an unresolved reference. */
-  logUnresolvedReference(ref: string) {
-    this.unresolvedReferences.add(ref);
+  /** Logs a reference to an item. */
+  countReference(name: string, registry?: RegistryKind) {
+    if (registry === undefined) {
+      return;
+    }
+    switch (registry) {
+      case RegistryKind.Definition:
+        this.data.definitions.countReference(name);
+        break;
+      case RegistryKind.Parameter:
+        this.data.parameters.countReference(name);
+        break;
+      case RegistryKind.Response:
+        this.data.responses.countReference(name);
+        break;
+      case RegistryKind.SecurityDefinition:
+        this.data.securityDefinitions.countReference(name);
+        break;
+    }
   }
 
-  /** Clears the list of unresolved references. */
-  resetUnresolvedReferences() {
-    this.unresolvedReferences.clear();
+  /** Logs an unresolved reference. */
+  logUnresolvedReference(ref: string, registry?: RegistryKind) {
+    if (registry === undefined) {
+      return;
+    }
+    switch (registry) {
+      case RegistryKind.Definition:
+        this.data.definitions.logUnresolved(ref);
+        break;
+      case RegistryKind.Parameter:
+        this.data.parameters.logUnresolved(ref);
+        break;
+      case RegistryKind.Response:
+        this.data.responses.logUnresolved(ref);
+        break;
+      case RegistryKind.SecurityDefinition:
+        this.data.securityDefinitions.logUnresolved(ref);
+        break;
+    }
   }
 
   /** Returns unresolved references. */
-  getUnresolvedReferences(): string[] {
-    return Array.from(this.unresolvedReferences);
+  getUnresolved(): Map<RegistryKind, string[]> {
+    const map = new Map<RegistryKind, string[]>();
+    map.set(RegistryKind.Definition, this.data.definitions.getUnresolved());
+    map.set(RegistryKind.Parameter, this.data.parameters.getUnresolved());
+    map.set(RegistryKind.Response, this.data.responses.getUnresolved());
+    map.set(
+      RegistryKind.SecurityDefinition,
+      this.data.securityDefinitions.getUnresolved()
+    );
+    return map;
+  }
+
+  /** Returns unreferenced items. */
+  getUnreferenced(): Map<RegistryKind, string[]> {
+    const map = new Map<RegistryKind, string[]>();
+    map.set(RegistryKind.Definition, this.data.definitions.getUnreferenced());
+    map.set(RegistryKind.Parameter, this.data.parameters.getUnreferenced());
+    map.set(RegistryKind.Response, this.data.responses.getUnreferenced());
+    map.set(
+      RegistryKind.SecurityDefinition,
+      this.data.securityDefinitions.getUnreferenced()
+    );
+    return map;
   }
 }

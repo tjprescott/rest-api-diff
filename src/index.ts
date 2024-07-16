@@ -8,6 +8,7 @@ const { diff } = pkg;
 import { OpenAPIV2 } from "openapi-types";
 import { exec } from "child_process";
 import * as dotenv from "dotenv";
+import { RegistryKind } from "./definitions.js";
 
 dotenv.config();
 
@@ -217,14 +218,29 @@ function validatePath(path: string): boolean {
   }
 }
 
+/** Reports on any unreferenced items unless --preserve-definitions is set. */
+function reportUnreferenced(key: string, data: Map<RegistryKind, string[]>) {
+  if (args["preserve-definitions"]) {
+    return;
+  }
+  for (const [kind, names] of data.entries()) {
+    if (names.length === 0) {
+      continue;
+    }
+    console.warn(
+      `Unreferenced ${RegistryKind[kind]} found in ${key}: ${names.join(", ")}`
+    );
+  }
+}
+
 async function main() {
   const in1 = args.lhs;
   const in2 = args.rhs;
 
-  let leftParser = new SwaggerParser(await loadPaths(in1));
-  let rightParser = new SwaggerParser(await loadPaths(in2));
-  const lhs = leftParser.asJSON();
-  const rhs = rightParser.asJSON();
+  let lhsParser = new SwaggerParser(await loadPaths(in1));
+  let rhsParser = new SwaggerParser(await loadPaths(in2));
+  const lhs = lhsParser.asJSON();
+  const rhs = rhsParser.asJSON();
 
   // sort the diffs into three buckets: flagged violations, assumed violations, and no violations
   const results = processDiff(diff(lhs, rhs), lhs, rhs);
@@ -288,6 +304,9 @@ async function main() {
     writeFlatViolations(allViolations, normalFilename, true);
     writeFlatViolations(results.noViolations, inverseFilename, false);
   }
+
+  reportUnreferenced("lhs.json", lhsParser.definitions.getUnreferenced());
+  reportUnreferenced("rhs.json", rhsParser.definitions.getUnreferenced());
 }
 
 async function writeGroupedViolations(

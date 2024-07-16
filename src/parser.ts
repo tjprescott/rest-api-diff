@@ -12,7 +12,7 @@ export interface ReferenceMetadata {
 
 /** A class for parsing Swagger files into an expanded, normalized form. */
 export class SwaggerParser {
-  private definitions: DefinitionRegistry;
+  public definitions: DefinitionRegistry;
   private parameterizedHost?: ParameterizedHost;
   private defaultConsumes?: string[];
   private defaultProduces?: string[];
@@ -26,9 +26,11 @@ export class SwaggerParser {
     for (const [_, data] of map.entries()) {
       this.#updateResult(this.parseRoot(data));
     }
-    const unresolvedReferences = this.definitions.getUnresolvedReferences();
-    if (unresolvedReferences.length > 0) {
-      console.warn(`Unresolved references: ${unresolvedReferences.join(", ")}`);
+    const unresolvedReferences = this.definitions.getUnresolved();
+    for (const [key, values] of unresolvedReferences) {
+      if (values.length > 0) {
+        console.warn(`Unresolved ${key} references: ${values.join(", ")}`);
+      }
     }
   }
 
@@ -66,17 +68,17 @@ export class SwaggerParser {
   }
 
   /** Parse a generic node. */
-  parse(obj: any): any {
+  parse(obj: any, kind?: RegistryKind): any {
     if (obj === undefined || obj === null) {
-      throw new Error(`Object is ${obj}}`);
+      return undefined;
     }
     // base case for primitive types
     if (typeof obj !== "object") {
       return obj;
     } else if (Array.isArray(obj)) {
-      return this.parseArray(obj);
+      return this.parseArray(obj, kind);
     } else if (typeof obj === "object") {
-      return this.parseObject(obj);
+      return this.parseObject(obj, kind);
     }
   }
 
@@ -112,13 +114,21 @@ export class SwaggerParser {
         case "consumes":
         case "produces":
         case "security":
-        case "definitions":
-        case "parameters":
-        case "responses":
-        case "securityDefinitions":
         case "tags":
         case "externalDocs":
           result[key] = this.parse(val);
+          break;
+        case "definitions":
+          result[key] = this.parse(val, RegistryKind.Definition);
+          break;
+        case "parameters":
+          result[key] = this.parse(val, RegistryKind.Parameter);
+          break;
+        case "responses":
+          result[key] = this.parse(val, RegistryKind.Response);
+          break;
+        case "securityDefinitions":
+          result[key] = this.parse(val, RegistryKind.SecurityDefinition);
           break;
         default:
           throw new Error(`Unhandled root key: ${key}`);
@@ -252,14 +262,14 @@ export class SwaggerParser {
     return result;
   }
 
-  parseArray(value: any[]): any {
+  parseArray(value: any[], kind?: RegistryKind): any {
     // console.log(`Array parse: ${path.fullPath()}`);
     // visit array objects but not arrays of primitives
     if (value.length > 0 && typeof value[0] === "object") {
       const values: any[] = [];
       for (let i = 0; i < value.length; i++) {
         const item = value[i];
-        values.push(this.parse(item));
+        values.push(this.parse(item, kind));
       }
       return values;
     } else {
@@ -267,7 +277,7 @@ export class SwaggerParser {
     }
   }
 
-  parseObject(value: any): any {
+  parseObject(value: any, kind?: RegistryKind): any {
     // console.log(`Object parse: ${path.fullPath()}`);
 
     // Retrieve any allOf references before parsing
@@ -297,7 +307,7 @@ export class SwaggerParser {
     } else {
       // get the value of the $ref key
       const ref = (value as any)["$ref"];
-      const expanded = this.#handleReference(ref);
+      const expanded = this.#handleReference(ref, kind);
       return expanded;
     }
   }
@@ -371,20 +381,24 @@ export class SwaggerParser {
     return normalizedPath;
   }
 
-  #handleReference(ref: string): any {
+  #handleReference(ref: string, kind?: RegistryKind): any {
     const refResult = this.#parseReference(ref);
+    const registryKind = refResult?.registry ?? kind;
     if (!refResult) {
-      this.definitions.logUnresolvedReference(ref);
+      this.definitions.logUnresolvedReference(ref, registryKind);
       return {
         $ref: ref,
       };
     }
-    let match = this.definitions.get(refResult.name, refResult.registry);
+    let match = this.definitions.get(refResult.name, registryKind);
     if (match) {
       return match;
     } else {
       // keep a reference so we can resolve on a subsequent pass
-      this.definitions.logUnresolvedReference(refResult.name);
+      if (kind) {
+        this.definitions.countReference(refResult.name, kind);
+        this.definitions.logUnresolvedReference(refResult.name, kind);
+      }
       return {
         $ref: ref,
       };
