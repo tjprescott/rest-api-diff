@@ -10,9 +10,29 @@ export interface ReferenceMetadata {
   filePath?: string;
 }
 
+/** Metadata describing the use of allOf */
+export interface AllOfMetadata {
+  /** The expanded allOf contents */
+  allOf: any;
+  /** The base class, if a single reference. */
+  baseClass?: string;
+  /** The list of derived classes, if applicable. */
+  derivedClasses: string[];
+}
+
+/** Options which may be set on the parsing operation. */
+export interface ParseOptions {
+  /** The registry to resolve references from. */
+  registry?: RegistryKind;
+  /** The object that this element being parsed belongs to. */
+  objectName?: string;
+  /** Expand references and allOf  */
+  expand?: boolean;
+}
+
 /** A class for parsing Swagger files into an expanded, normalized form. */
 export class SwaggerParser {
-  public definitions: DefinitionRegistry;
+  public defRegistry: DefinitionRegistry;
   private parameterizedHost?: ParameterizedHost;
   private defaultConsumes?: string[];
   private defaultProduces?: string[];
@@ -21,12 +41,11 @@ export class SwaggerParser {
   private result = {};
 
   constructor(map: Map<string, any>) {
-    this.definitions = new DefinitionRegistry(map, this);
-    this.definitions.initialize();
+    this.defRegistry = new DefinitionRegistry(map);
     for (const [_, data] of map.entries()) {
       this.#updateResult(this.parseRoot(data));
     }
-    const unresolvedReferences = this.definitions.getUnresolved();
+    const unresolvedReferences = this.defRegistry.getUnresolved();
     for (const [key, values] of unresolvedReferences) {
       if (values.length > 0) {
         console.warn(`Unresolved ${key} references: ${values.join(", ")}`);
@@ -68,7 +87,7 @@ export class SwaggerParser {
   }
 
   /** Parse a generic node. */
-  parse(obj: any, kind?: RegistryKind): any {
+  parse(obj: any, options?: ParseOptions): any {
     if (obj === undefined || obj === null) {
       return undefined;
     }
@@ -76,14 +95,14 @@ export class SwaggerParser {
     if (typeof obj !== "object") {
       return obj;
     } else if (Array.isArray(obj)) {
-      return this.parseArray(obj, kind);
+      return this.parseArray(obj);
     } else if (typeof obj === "object") {
-      return this.parseObject(obj, kind);
+      return this.parseObject(obj, options);
     }
   }
 
   /** Special handling for the root of a Swagger object. */
-  parseRoot(obj: any): any {
+  parseRoot(obj: any, options?: ParseOptions): any {
     let result: any = {};
 
     // Retrieve any top-level defaults that need to be normalized later on.
@@ -116,19 +135,31 @@ export class SwaggerParser {
         case "security":
         case "tags":
         case "externalDocs":
-          result[key] = this.parse(val);
+          result[key] = this.parse(val, options);
           break;
         case "definitions":
-          result[key] = this.parse(val, RegistryKind.Definition);
+          result[key] = this.parse(val, {
+            ...options,
+            registry: RegistryKind.Definition,
+          });
           break;
         case "parameters":
-          result[key] = this.parse(val, RegistryKind.Parameter);
+          result[key] = this.parse(val, {
+            ...options,
+            registry: RegistryKind.Parameter,
+          });
           break;
         case "responses":
-          result[key] = this.parse(val, RegistryKind.Response);
+          result[key] = this.parse(val, {
+            ...options,
+            registry: RegistryKind.Response,
+          });
           break;
         case "securityDefinitions":
-          result[key] = this.parse(val, RegistryKind.SecurityDefinition);
+          result[key] = this.parse(val, {
+            ...options,
+            registry: RegistryKind.SecurityDefinition,
+          });
           break;
         default:
           throw new Error(`Unhandled root key: ${key}`);
@@ -138,15 +169,15 @@ export class SwaggerParser {
   }
 
   /** Parse a response object. */
-  #parseResponse(value: any): any {
+  #parseResponse(value: any, options?: ParseOptions): any {
     let result: any = {};
     const sortedEntries = Object.entries(value).sort();
     for (const [key, val] of sortedEntries) {
       if (key === "schema") {
-        const expanded = this.parse(val);
+        const expanded = this.parse(val, options);
         result[key] = expanded;
       } else {
-        result[key] = this.parse(val);
+        result[key] = this.parse(val, options);
       }
     }
     return result;
@@ -178,7 +209,7 @@ export class SwaggerParser {
   }
 
   /** Parse the operation responses object. */
-  #parseResponses(value: any): any {
+  #parseResponses(value: any, options?: ParseOptions): any {
     let result: any = {};
     for (const [code, data] of Object.entries(value)) {
       if (code === "default") {
@@ -269,7 +300,7 @@ export class SwaggerParser {
       const values: any[] = [];
       for (let i = 0; i < value.length; i++) {
         const item = value[i];
-        values.push(this.parse(item, kind));
+        values.push(this.parse(item, { registry: kind }));
       }
       return values;
     } else {
@@ -277,18 +308,33 @@ export class SwaggerParser {
     }
   }
 
-  parseObject(value: any, kind?: RegistryKind): any {
-    // console.log(`Object parse: ${path.fullPath()}`);
-
+  parseObject(value: any, options?: ParseOptions): any {
     // Retrieve any allOf references before parsing
-    const allOf = value["allOf"];
-    delete value["allOf"];
-    let expAllOf: any[] = [];
-    if (allOf) {
-      expAllOf = this.parse(allOf);
-    }
-
     if (!this.#isReference(value)) {
+      // let expAllOf: any[] = [];
+      // let derivedClasses: string[] = [];
+      // if (allOf) {
+      //   if (
+      //     allOf.length === 1 &&
+      //     this.#isReference(allOf[0]) &&
+      //   ) {
+      //     const refResult = this.#parseReference((allOf[0] as any)["$ref"]);
+      //     if (refResult) {
+      //       const parent = this.defRegistry.get(
+      //         refResult.name,
+      //         refResult.registry
+      //       );
+      //       if (parent) {
+      //         const derivedClasses = parent["$derivedClasses"] ?? [];
+      //         derivedClasses.push(options?.objectName!);
+      //         parent["$derivedClasses"] = derivedClasses;
+      //       }
+      //     }
+      //   }
+      //   // TODO: Expand out all of the the $derivedClass references
+      //   expAllOf = this.#parseAllOf(allOf, derivedClasses);
+      // }
+
       const result: any = {};
       // visit each key in the object in sorted order
       const sortedEntries = Object.entries(value).sort();
@@ -296,10 +342,10 @@ export class SwaggerParser {
         let allVal = val as any;
         // combine any properties that may be added from "allOf" references
         if (typeof val === "object") {
-          for (const item of expAllOf) {
-            const match = (item as any)[key] ?? {};
-            allVal = { ...allVal, ...match };
-          }
+          // for (const item of expAllOf) {
+          //   const match = (item as any)[key] ?? {};
+          //   allVal = { ...allVal, ...match };
+          // }
         }
         result[key] = this.parse(allVal);
       }
@@ -307,9 +353,40 @@ export class SwaggerParser {
     } else {
       // get the value of the $ref key
       const ref = (value as any)["$ref"];
-      const expanded = this.#handleReference(ref, kind);
+      const expanded = this.#handleReference(ref, options?.registry);
       return expanded;
     }
+  }
+
+  #parseAllOf(name: string, data: any): AllOfMetadata | undefined {
+    const allOfValue = data["allOf"];
+    if (!allOfValue) {
+      return undefined;
+    }
+    delete data["allOf"];
+
+    if (allOfValue.length === 1 && this.#isReference(allOfValue[0])) {
+      const refValue = (allOfValue[0] as any)["$ref"];
+      const refResult = this.#parseReference(refValue);
+      if (!refResult) {
+        throw new Error(`Invalid reference: ${refValue}`);
+      }
+      const parent = this.defRegistry.get(refResult.name, refResult.registry);
+      if (parent) {
+        const derivedClasses = parent["$derivedClasses"] ?? new Set();
+        derivedClasses.add(name);
+        parent["$derivedClasses"] = derivedClasses;
+      }
+      return {
+        allOf: [],
+        baseClass: refResult.name,
+        derivedClasses: [],
+      };
+    } else {
+      // TODO: This just contains properties to merge into the current object
+      let test = "best";
+    }
+    return undefined;
   }
 
   #parseReference(ref: string): ReferenceMetadata | undefined {
@@ -385,19 +462,19 @@ export class SwaggerParser {
     const refResult = this.#parseReference(ref);
     const registryKind = refResult?.registry ?? kind;
     if (!refResult) {
-      this.definitions.logUnresolvedReference(ref, registryKind);
+      this.defRegistry.logUnresolvedReference(ref, registryKind);
       return {
         $ref: ref,
       };
     }
-    let match = this.definitions.get(refResult.name, registryKind);
+    let match = this.defRegistry.get(refResult.name, registryKind);
     if (match) {
       return match;
     } else {
       // keep a reference so we can resolve on a subsequent pass
       if (kind) {
-        this.definitions.countReference(refResult.name, kind);
-        this.definitions.logUnresolvedReference(refResult.name, kind);
+        this.defRegistry.countReference(refResult.name, kind);
+        this.defRegistry.logUnresolvedReference(refResult.name, kind);
       }
       return {
         $ref: ref,

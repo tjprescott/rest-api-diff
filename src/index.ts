@@ -305,8 +305,8 @@ async function main() {
     writeFlatViolations(results.noViolations, inverseFilename, false);
   }
 
-  reportUnreferenced("lhs.json", lhsParser.definitions.getUnreferenced());
-  reportUnreferenced("rhs.json", rhsParser.definitions.getUnreferenced());
+  reportUnreferenced("lhs.json", lhsParser.defRegistry.getUnreferenced());
+  reportUnreferenced("rhs.json", rhsParser.defRegistry.getUnreferenced());
 }
 
 async function writeGroupedViolations(
