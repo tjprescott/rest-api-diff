@@ -1,4 +1,5 @@
 import { OpenAPIV2 } from "openapi-types";
+import { isReference, parseReference } from "./util.js";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {
@@ -9,11 +10,12 @@ export enum RegistryKind {
 }
 
 export class CollectionRegistry {
+  public kind: RegistryKind;
   public data = new Map<string, any>();
   private unreferenced = new Set<string>();
-  private unresolved = new Set<string>();
 
-  constructor(data: Map<string, any>, key: string) {
+  constructor(data: Map<string, any>, key: string, kind: RegistryKind) {
+    this.kind = kind;
     for (const [_, value] of data.entries()) {
       const subdata = (value as any)[key];
       if (subdata !== undefined) {
@@ -34,11 +36,6 @@ export class CollectionRegistry {
     return this.data.get(name);
   }
 
-  /** Mark an item as an unresolved reference. */
-  logUnresolved(name: string) {
-    this.unresolved.add(name);
-  }
-
   /** Mark an item as referenced. */
   countReference(name: string) {
     if (this.unreferenced.has(name)) {
@@ -49,11 +46,6 @@ export class CollectionRegistry {
   /** Resolve list of unreferenced objects. */
   getUnreferenced(): string[] {
     return Array.from(this.unreferenced);
-  }
-
-  /** Retrieve list of unresolved items. */
-  getUnresolved(): string[] {
-    return Array.from(this.unresolved);
   }
 }
 
@@ -67,127 +59,149 @@ export class DefinitionRegistry {
   };
   private polymorphicMap = new Map<string, Set<string>>();
   private swaggerMap: Map<string, OpenAPIV2.Document>;
+  private unresolvedReferences = new Set<string>();
 
   constructor(map: Map<string, OpenAPIV2.Document>) {
     this.swaggerMap = map;
     this.data = {
-      definitions: new CollectionRegistry(map, "definitions"),
-      parameters: new CollectionRegistry(map, "parameters"),
-      responses: new CollectionRegistry(map, "responses"),
-      securityDefinitions: new CollectionRegistry(map, "securityDefinitions"),
+      definitions: new CollectionRegistry(
+        map,
+        "definitions",
+        RegistryKind.Definition
+      ),
+      parameters: new CollectionRegistry(
+        map,
+        "parameters",
+        RegistryKind.Parameter
+      ),
+      responses: new CollectionRegistry(
+        map,
+        "responses",
+        RegistryKind.Response
+      ),
+      securityDefinitions: new CollectionRegistry(
+        map,
+        "securityDefinitions",
+        RegistryKind.SecurityDefinition
+      ),
     };
     this.#gatherDefinitions(this.swaggerMap);
     this.#expandReferences();
   }
 
-  #expandObject(item: any) {
-    if (this.#isReference(item)) {
+  #expandObject(item: any): any {
+    if (isReference(item)) {
       const ref = item["$ref"];
-      let test = "best";
-      // const expanded = this.#handleReference(ref, options?.registry);
-      // return expanded;
+      const refResult = parseReference(ref);
+      if (!refResult) {
+        return {
+          $ref: ref,
+        };
+      }
+      const kind = refResult.registry;
+      let match = this.get(refResult.name, kind);
+      if (match) {
+        return match;
+      } else {
+        return {
+          $ref: ref,
+        };
+      }
     } else {
+      const expanded: any = {};
       for (const [propName, propValue] of Object.entries(item)) {
+        expanded[propName] = this.#expand(propValue);
+      }
+      return expanded;
+    }
+  }
+
+  #expandArray(values: any[]): any[] {
+    // visit array objects but not arrays of primitives
+    const expanded: any[] = [];
+    for (const val of values ?? []) {
+      const expVal = this.#expand(val);
+      expanded.push(expVal);
+    }
+    return expanded;
+  }
+
+  #expandAllOf(base: any): any {
+    const allOf = base.allOf;
+    delete base.allOf;
+    if (allOf === undefined) {
+      return base;
+    }
+    const expAllOf = this.#expand(allOf);
+    let allKeys = [...Object.keys(base)];
+    for (const item of expAllOf) {
+      allKeys = allKeys.concat(Object.keys(item));
+    }
+    // eliminate duplicates
+    allKeys = Array.from(new Set(allKeys));
+    for (const key of allKeys) {
+      const baseVal = base[key];
+      for (const item of expAllOf) {
+        const itemVal = item[key];
+        switch (key) {
+          case "required":
+            base[key] = (baseVal ?? []).concat(itemVal ?? []);
+            break;
+          case "properties":
+            base[key] = { ...(baseVal ?? {}), ...(itemVal ?? {}) };
+            break;
+          default:
+            break;
+        }
+      }
+    }
+    return base;
+  }
+
+  #expand(item: any): any {
+    if (typeof item !== "object") {
+      return item;
+    } else if (Array.isArray(item)) {
+      return this.#expandArray(item);
+    } else if (typeof item === "object") {
+      return this.#expandObject(item);
+    }
+  }
+
+  #expandReferencesForCollection(collection: CollectionRegistry) {
+    for (const [key, value] of collection.data.entries()) {
+      for (const [_, propValue] of Object.entries(value)) {
         this.#expand(propValue);
+      }
+      const expVal = this.#expandAllOf(value);
+      collection.data.set(key, expVal);
+    }
+    // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
+    for (const [_, value] of collection.data.entries()) {
+      const derivedClasses = value["$derivedClasses"];
+      if (!derivedClasses) {
+        continue;
+      }
+      value["$anyOf"] = [];
+      for (const derived of derivedClasses) {
+        const derivedClass = this.get(derived, collection.kind);
+        if (derivedClass === undefined) {
+          throw new Error(`Derived class ${derived} not found.`);
+        }
+        value["$anyOf"].push(derivedClass);
       }
     }
   }
 
-  // // Retrieve any allOf references before parsing
-  // if (!this.#isReference(value)) {
-  //   // let expAllOf: any[] = [];
-  //   // let derivedClasses: string[] = [];
-  //   // if (allOf) {
-  //   //   if (
-  //   //     allOf.length === 1 &&
-  //   //     this.#isReference(allOf[0]) &&
-  //   //   ) {
-  //   //     const refResult = this.#parseReference((allOf[0] as any)["$ref"]);
-  //   //     if (refResult) {
-  //   //       const parent = this.defRegistry.get(
-  //   //         refResult.name,
-  //   //         refResult.registry
-  //   //       );
-  //   //       if (parent) {
-  //   //         const derivedClasses = parent["$derivedClasses"] ?? [];
-  //   //         derivedClasses.push(options?.objectName!);
-  //   //         parent["$derivedClasses"] = derivedClasses;
-  //   //       }
-  //   //     }
-  //   //   }
-  //   //   // TODO: Expand out all of the the $derivedClass references
-  //   //   expAllOf = this.#parseAllOf(allOf, derivedClasses);
-  //   // }
-
-  //   const result: any = {};
-  //   // visit each key in the object in sorted order
-  //   const sortedEntries = Object.entries(value).sort();
-  //   for (const [key, val] of sortedEntries) {
-  //     let allVal = val as any;
-  //     // combine any properties that may be added from "allOf" references
-  //     if (typeof val === "object") {
-  //       // for (const item of expAllOf) {
-  //       //   const match = (item as any)[key] ?? {};
-  //       //   allVal = { ...allVal, ...match };
-  //       // }
-  //     }
-  //     result[key] = this.parse(allVal);
-  //   }
-  //   return result;
-  // } else {
-  //   // get the value of the $ref key
-  //   const ref = (value as any)["$ref"];
-  //   const expanded = this.#handleReference(ref, options?.registry);
-  //   return expanded;
-  // }
-
-  #expand(item: any) {
-    if (typeof item !== "object") {
-      return;
-    } else if (Array.isArray(item)) {
-      // TODO: visit elements of the array
-      let test = "best";
-    } else if (typeof item === "object") {
-      this.#expandObject(item);
-    }
-  }
-
-  #expandReferencesForItem(key: string, value: any) {
-    for (const [propName, propValue] of Object.entries(value)) {
-      this.#expand(propValue);
-    }
-    const allOf = value.allOf;
-    const derivedClasses = value["$derivedClasses"];
-    delete value["allOf"];
-    delete value["$derivedClasses"];
-    let test = "best";
-  }
-
   #expandReferences() {
-    for (const [key, value] of this.data.definitions.data.entries()) {
-      this.#expandReferencesForItem(key, value);
-    }
-    for (const [key, value] of this.data.parameters.data.entries()) {
-      this.#expandReferencesForItem(key, value);
-    }
-    for (const [key, value] of this.data.responses.data.entries()) {
-      this.#expandReferencesForItem(key, value);
-    }
-    for (const [key, value] of this.data.securityDefinitions.data.entries()) {
-      this.#expandReferencesForItem(key, value);
-    }
-  }
-
-  #isReference(value: any): boolean {
-    return Object.keys(value).includes("$ref");
+    this.#expandReferencesForCollection(this.data.definitions);
+    this.#expandReferencesForCollection(this.data.parameters);
+    this.#expandReferencesForCollection(this.data.responses);
+    this.#expandReferencesForCollection(this.data.securityDefinitions);
   }
 
   #processAllOf(allOf: any, key: string) {
-    if (
-      Array.isArray(allOf) &&
-      allOf.length === 1 &&
-      this.#isReference(allOf[0])
-    ) {
+    if (Array.isArray(allOf) && allOf.length === 1 && isReference(allOf[0])) {
       // allOf is targeting a base class
       const ref = allOf[0].$ref;
       const refParts = ref.split("/");
@@ -219,6 +233,7 @@ export class DefinitionRegistry {
         this.#processAllOf(allOf, key);
       }
     }
+    this.data.parameters.add(key, data);
   }
 
   #visitResponse(key: string, data: any) {
@@ -257,7 +272,26 @@ export class DefinitionRegistry {
       if (baseClass === undefined) {
         throw new Error(`Base class ${name} not found.`);
       }
+      // ensure all base classes have the discriminator property
+      const discriminator = baseClass.discriminator;
+      if (discriminator === undefined) {
+        console.warn(`Base class ${name} has no discriminator.`);
+      }
       baseClass["$derivedClasses"] = Array.from(set);
+    }
+  }
+
+  /** Get a collection. */
+  getCollection(registry: RegistryKind): Map<string, any> {
+    switch (registry) {
+      case RegistryKind.Definition:
+        return this.data.definitions.data;
+      case RegistryKind.Parameter:
+        return this.data.parameters.data;
+      case RegistryKind.Response:
+        return this.data.responses.data;
+      case RegistryKind.SecurityDefinition:
+        return this.data.securityDefinitions.data;
     }
   }
 
@@ -304,37 +338,23 @@ export class DefinitionRegistry {
   }
 
   /** Logs an unresolved reference. */
-  logUnresolvedReference(ref: string, registry?: RegistryKind) {
-    if (registry === undefined) {
+  logUnresolvedReference(ref: any) {
+    if (typeof ref === "string") {
+      this.unresolvedReferences.add(ref);
       return;
-    }
-    switch (registry) {
-      case RegistryKind.Definition:
-        this.data.definitions.logUnresolved(ref);
-        break;
-      case RegistryKind.Parameter:
-        this.data.parameters.logUnresolved(ref);
-        break;
-      case RegistryKind.Response:
-        this.data.responses.logUnresolved(ref);
-        break;
-      case RegistryKind.SecurityDefinition:
-        this.data.securityDefinitions.logUnresolved(ref);
-        break;
+    } else if (typeof ref === "object") {
+      if (isReference(ref)) {
+        const refName = ref["$ref"];
+        this.unresolvedReferences.add(refName);
+      }
+    } else {
+      throw new Error("Unsupported reference type.");
     }
   }
 
   /** Returns unresolved references. */
-  getUnresolved(): Map<RegistryKind, string[]> {
-    const map = new Map<RegistryKind, string[]>();
-    map.set(RegistryKind.Definition, this.data.definitions.getUnresolved());
-    map.set(RegistryKind.Parameter, this.data.parameters.getUnresolved());
-    map.set(RegistryKind.Response, this.data.responses.getUnresolved());
-    map.set(
-      RegistryKind.SecurityDefinition,
-      this.data.securityDefinitions.getUnresolved()
-    );
-    return map;
+  getUnresolvedReferences(): string[] {
+    return Array.from(this.unresolvedReferences);
   }
 
   /** Returns unreferenced items. */
@@ -347,6 +367,11 @@ export class DefinitionRegistry {
       RegistryKind.SecurityDefinition,
       this.data.securityDefinitions.getUnreferenced()
     );
+    for (const [key, value] of map.entries()) {
+      if (value.length === 0) {
+        map.delete(key);
+      }
+    }
     return map;
   }
 }

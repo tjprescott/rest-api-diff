@@ -2,23 +2,7 @@ import * as crypto from "crypto";
 import { OpenAPI, OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
 import { ParameterizedHost } from "./extensions/parameterized-host.js";
-import * as fs from "fs";
-
-export interface ReferenceMetadata {
-  name: string;
-  registry: RegistryKind;
-  filePath?: string;
-}
-
-/** Metadata describing the use of allOf */
-export interface AllOfMetadata {
-  /** The expanded allOf contents */
-  allOf: any;
-  /** The base class, if a single reference. */
-  baseClass?: string;
-  /** The list of derived classes, if applicable. */
-  derivedClasses: string[];
-}
+import { isReference, parseReference } from "./util.js";
 
 /** Options which may be set on the parsing operation. */
 export interface ParseOptions {
@@ -38,42 +22,12 @@ export class SwaggerParser {
   private defaultProduces?: string[];
   private errorSchemas: Map<string, OpenAPIV2.SchemaObject> = new Map();
   private host?: string;
-  private result = {};
+  private swaggerMap: Map<string, any>;
+  private result: any = {};
 
   constructor(map: Map<string, any>) {
     this.defRegistry = new DefinitionRegistry(map);
-    for (const [_, data] of map.entries()) {
-      this.#updateResult(this.parseRoot(data));
-    }
-    const unresolvedReferences = this.defRegistry.getUnresolved();
-    for (const [key, values] of unresolvedReferences) {
-      if (values.length > 0) {
-        console.warn(`Unresolved ${key} references: ${values.join(", ")}`);
-      }
-    }
-  }
-
-  /** Merge the top-level Swagger keys */
-  #updateResult(values: any) {
-    const updatableKeys = [
-      "paths",
-      "definitions",
-      "parameters",
-      "responses",
-      "securityDefinitions",
-    ];
-    for (const [key, value] of Object.entries(values)) {
-      if (updatableKeys.includes(key)) {
-        const existing = (this.result as any)[key] ?? {};
-        (this.result as any)[key] = { ...existing, ...(value as any) };
-      } else {
-        const existing = (this.result as any)[key];
-        if (existing) {
-          continue;
-        }
-        (this.result as any)[key] = value;
-      }
-    }
+    this.swaggerMap = map;
   }
 
   /** Get the parsed result as a JSON object. */
@@ -87,7 +41,7 @@ export class SwaggerParser {
   }
 
   /** Parse a generic node. */
-  parse(obj: any, options?: ParseOptions): any {
+  parseNode(obj: any): any {
     if (obj === undefined || obj === null) {
       return undefined;
     }
@@ -95,89 +49,120 @@ export class SwaggerParser {
     if (typeof obj !== "object") {
       return obj;
     } else if (Array.isArray(obj)) {
-      return this.parseArray(obj);
+      return this.#parseArray(obj);
     } else if (typeof obj === "object") {
-      return this.parseObject(obj, options);
+      return this.#parseObject(obj);
     }
   }
 
   /** Special handling for the root of a Swagger object. */
-  parseRoot(obj: any, options?: ParseOptions): any {
-    let result: any = {};
+  parse(): SwaggerParser {
+    for (const [filename, data] of this.swaggerMap.entries()) {
+      // Retrieve any top-level defaults that need to be normalized later on.
+      this.parameterizedHost = data["x-ms-parameterized-host"];
+      this.defaultConsumes = data["consumes"];
+      this.defaultProduces = data["produces"];
+      this.host = data["host"];
+      delete data["x-ms-parameterized-host"];
+      delete data["consumes"];
+      delete data["produces"];
+      delete data["host"];
 
-    // Retrieve any top-level defaults that need to be normalized later on.
-    this.parameterizedHost = obj["x-ms-parameterized-host"];
-    this.defaultConsumes = obj["consumes"];
-    this.defaultProduces = obj["produces"];
-    this.host = obj["host"];
-    delete obj["x-ms-parameterized-host"];
-    delete obj["consumes"];
-    delete obj["produces"];
-    delete obj["host"];
+      const paths = data["paths"] ?? {};
+      const xMsPaths = data["x-ms-paths"] ?? {};
+      delete data["paths"];
+      delete data["x-ms-paths"];
 
-    const paths = obj["paths"] ?? {};
-    const xMsPaths = obj["x-ms-paths"] ?? {};
-    delete obj["paths"];
-    delete obj["x-ms-paths"];
+      // combine the paths and x-ms-paths objects
+      const allPaths = { ...paths, ...xMsPaths };
+      const newPaths = this.parsePaths(allPaths);
+      if (!this.result.paths) {
+        this.result.paths = {};
+      }
+      for (const [path, data] of Object.entries(newPaths)) {
+        this.result.paths[path] = data;
+      }
 
-    const allPaths = { ...paths, ...xMsPaths };
-    result["paths"] = this.parsePaths(allPaths);
-
-    for (const [key, val] of Object.entries(obj)) {
-      switch (key) {
-        case "swagger":
-        case "info":
-        case "host":
-        case "basePath":
-        case "schemes":
-        case "consumes":
-        case "produces":
-        case "security":
-        case "tags":
-        case "externalDocs":
-          result[key] = this.parse(val, options);
-          break;
-        case "definitions":
-          result[key] = this.parse(val, {
-            ...options,
-            registry: RegistryKind.Definition,
-          });
-          break;
-        case "parameters":
-          result[key] = this.parse(val, {
-            ...options,
-            registry: RegistryKind.Parameter,
-          });
-          break;
-        case "responses":
-          result[key] = this.parse(val, {
-            ...options,
-            registry: RegistryKind.Response,
-          });
-          break;
-        case "securityDefinitions":
-          result[key] = this.parse(val, {
-            ...options,
-            registry: RegistryKind.SecurityDefinition,
-          });
-          break;
-        default:
-          throw new Error(`Unhandled root key: ${key}`);
+      for (const [key, val] of Object.entries(data)) {
+        switch (key) {
+          case "swagger":
+          case "info":
+          case "host":
+          case "basePath":
+          case "schemes":
+          case "consumes":
+          case "produces":
+          case "security":
+          case "tags":
+          case "externalDocs":
+            this.result[key] = this.parseNode(val);
+            break;
+          case "definitions":
+            this.result[key] = this.defRegistry.getCollection(
+              RegistryKind.Definition
+            );
+            break;
+          case "parameters":
+            this.result[key] = this.defRegistry.getCollection(
+              RegistryKind.Parameter
+            );
+            break;
+          case "responses":
+            this.result[key] = this.defRegistry.getCollection(
+              RegistryKind.Response
+            );
+            break;
+          case "securityDefinitions":
+            this.result[key] = this.defRegistry.getCollection(
+              RegistryKind.SecurityDefinition
+            );
+            break;
+          default:
+            throw new Error(`Unhandled root key: ${key}`);
+        }
       }
     }
-    return result;
+    return this;
+  }
+
+  reportUnresolvedReferences(): void {
+    const unresolvedReferences = this.defRegistry.getUnresolvedReferences();
+    if (unresolvedReferences.length > 0) {
+      console.warn(
+        `== UNRESOLVED REFERENCES == (${unresolvedReferences.length})\n\n`
+      );
+      console.warn(`${unresolvedReferences.join("\n")}`);
+    }
+  }
+
+  reportUnreferencedObjects(): void {
+    const unreferencedDefinitions = this.defRegistry.getUnreferenced();
+    if (unreferencedDefinitions.size > 0) {
+      let total = 0;
+      for (const value of unreferencedDefinitions.values()) {
+        total += value.length;
+      }
+      console.warn(`\n== UNREFERENCED DEFINITIONS == (${total})\n`);
+    }
+    for (const [key, value] of unreferencedDefinitions.entries()) {
+      if (value.length > 0) {
+        console.warn(
+          `\n**${RegistryKind[key]}** (${value.length})\n\n${value.join("\n")}`
+        );
+      }
+    }
   }
 
   /** Parse a response object. */
-  #parseResponse(value: any, options?: ParseOptions): any {
+  #parseResponse(value: any): any {
     let result: any = {};
     const sortedEntries = Object.entries(value).sort();
     for (const [key, val] of sortedEntries) {
       if (key === "schema") {
-        const expanded = this.parse(val, options);
+        const expanded = this.parseNode(val);
         result[key] = expanded;
       } else {
-        result[key] = this.parse(val, options);
+        result[key] = this.parseNode(val);
       }
     }
     return result;
@@ -216,7 +201,7 @@ export class SwaggerParser {
         // Don't expand the default response. We will handle this in a special way.
         const errorName = this.#parseErrorName(data);
         if (!this.errorSchemas.has(errorName)) {
-          const expandedError = this.parse(data);
+          const expandedError = this.parseNode(data);
           this.errorSchemas.set(errorName, expandedError);
         }
         // Later we will revisit and replace all of there with a value indicating they are, or are not, compatible.
@@ -242,7 +227,7 @@ export class SwaggerParser {
         const hostParams = this.parameterizedHost?.parameters ?? [];
         const allParams = [...(val as Array<any>), ...hostParams];
 
-        const expanded = this.parse(allParams);
+        const expanded = this.parseNode(allParams);
         // ensure parameters are sorted by name since this ordering doesn't
         // matter from a REST API perspective.
         const sorted = (expanded as Array<any>).sort((a: any, b: any) => {
@@ -265,7 +250,7 @@ export class SwaggerParser {
       } else if (key === "responses") {
         result[key] = this.#parseResponses(val);
       } else {
-        result[key] = this.parse(value[key]);
+        result[key] = this.parseNode(value[key]);
       }
     }
     return result;
@@ -293,14 +278,13 @@ export class SwaggerParser {
     return result;
   }
 
-  parseArray(value: any[], kind?: RegistryKind): any {
-    // console.log(`Array parse: ${path.fullPath()}`);
+  #parseArray(value: any[], kind?: RegistryKind): any {
     // visit array objects but not arrays of primitives
     if (value.length > 0 && typeof value[0] === "object") {
       const values: any[] = [];
       for (let i = 0; i < value.length; i++) {
         const item = value[i];
-        values.push(this.parse(item, { registry: kind }));
+        values.push(this.parseNode(item));
       }
       return values;
     } else {
@@ -308,122 +292,40 @@ export class SwaggerParser {
     }
   }
 
-  parseObject(value: any, options?: ParseOptions): any {
-    // Retrieve any allOf references before parsing
-    if (!this.#isReference(value)) {
-      // let expAllOf: any[] = [];
-      // let derivedClasses: string[] = [];
-      // if (allOf) {
-      //   if (
-      //     allOf.length === 1 &&
-      //     this.#isReference(allOf[0]) &&
-      //   ) {
-      //     const refResult = this.#parseReference((allOf[0] as any)["$ref"]);
-      //     if (refResult) {
-      //       const parent = this.defRegistry.get(
-      //         refResult.name,
-      //         refResult.registry
-      //       );
-      //       if (parent) {
-      //         const derivedClasses = parent["$derivedClasses"] ?? [];
-      //         derivedClasses.push(options?.objectName!);
-      //         parent["$derivedClasses"] = derivedClasses;
-      //       }
-      //     }
-      //   }
-      //   // TODO: Expand out all of the the $derivedClass references
-      //   expAllOf = this.#parseAllOf(allOf, derivedClasses);
-      // }
-
-      const result: any = {};
-      // visit each key in the object in sorted order
-      const sortedEntries = Object.entries(value).sort();
-      for (const [key, val] of sortedEntries) {
-        let allVal = val as any;
-        // combine any properties that may be added from "allOf" references
-        if (typeof val === "object") {
-          // for (const item of expAllOf) {
-          //   const match = (item as any)[key] ?? {};
-          //   allVal = { ...allVal, ...match };
-          // }
-        }
-        result[key] = this.parse(allVal);
-      }
-      return result;
-    } else {
+  #parseObject(value: any): any {
+    if (isReference(value)) {
       // get the value of the $ref key
       const ref = (value as any)["$ref"];
-      const expanded = this.#handleReference(ref, options?.registry);
-      return expanded;
-    }
-  }
-
-  #parseAllOf(name: string, data: any): AllOfMetadata | undefined {
-    const allOfValue = data["allOf"];
-    if (!allOfValue) {
-      return undefined;
-    }
-    delete data["allOf"];
-
-    if (allOfValue.length === 1 && this.#isReference(allOfValue[0])) {
-      const refValue = (allOfValue[0] as any)["$ref"];
-      const refResult = this.#parseReference(refValue);
+      const refResult = parseReference(ref);
       if (!refResult) {
-        throw new Error(`Invalid reference: ${refValue}`);
+        // preseve the $ref and log an unresolved reference
+        this.defRegistry.logUnresolvedReference(value);
+        return {
+          $ref: ref,
+        };
       }
-      const parent = this.defRegistry.get(refResult.name, refResult.registry);
-      if (parent) {
-        const derivedClasses = parent["$derivedClasses"] ?? new Set();
-        derivedClasses.add(name);
-        parent["$derivedClasses"] = derivedClasses;
+      const resolved = this.defRegistry.get(refResult.name, refResult.registry);
+      if (!resolved) {
+        // log an unresolved reference
+        this.defRegistry.logUnresolvedReference(value);
+        return {
+          $ref: ref,
+        };
       }
-      return {
-        allOf: [],
-        baseClass: refResult.name,
-        derivedClasses: [],
-      };
-    } else {
-      // TODO: This just contains properties to merge into the current object
-      let test = "best";
+      this.defRegistry.countReference(refResult.name, refResult.registry);
+      const derivedClasses = resolved["$derivedClasses"];
+      for (const item of derivedClasses ?? []) {
+        this.defRegistry.countReference(item, refResult.registry);
+      }
+      return resolved;
     }
-    return undefined;
-  }
-
-  #parseReference(ref: string): ReferenceMetadata | undefined {
-    const regex = /(.+\.json)?#\/(.+)\/(.+)/;
-    const match = ref.match(regex);
-    if (!match) {
-      return undefined;
+    const result: any = {};
+    // visit each key in the object in sorted order
+    const sortedEntries = Object.entries(value).sort();
+    for (const [key, val] of sortedEntries) {
+      result[key] = this.parseNode(val);
     }
-    const path = match[1];
-    const section = match[2];
-    const name = match[3];
-    let registry: RegistryKind;
-    switch (section) {
-      case "definitions":
-        registry = RegistryKind.Definition;
-        break;
-      case "parameters":
-        registry = RegistryKind.Parameter;
-        break;
-      case "responses":
-        registry = RegistryKind.Response;
-        break;
-      case "securityDefinitions":
-        registry = RegistryKind.SecurityDefinition;
-        break;
-      default:
-        throw new Error(`Unknown registry: ${section}`);
-    }
-    return {
-      filePath: path,
-      registry: registry,
-      name: name,
-    };
-  }
-
-  #isReference(value: any): boolean {
-    return Object.keys(value).includes("$ref");
+    return result;
   }
 
   #normalizeName(name: string): string {
@@ -456,29 +358,5 @@ export class SwaggerParser {
     }
     normalizedPath = pathComponents.join("");
     return normalizedPath;
-  }
-
-  #handleReference(ref: string, kind?: RegistryKind): any {
-    const refResult = this.#parseReference(ref);
-    const registryKind = refResult?.registry ?? kind;
-    if (!refResult) {
-      this.defRegistry.logUnresolvedReference(ref, registryKind);
-      return {
-        $ref: ref,
-      };
-    }
-    let match = this.defRegistry.get(refResult.name, registryKind);
-    if (match) {
-      return match;
-    } else {
-      // keep a reference so we can resolve on a subsequent pass
-      if (kind) {
-        this.defRegistry.countReference(refResult.name, kind);
-        this.defRegistry.logUnresolvedReference(refResult.name, kind);
-      }
-      return {
-        $ref: ref,
-      };
-    }
   }
 }
