@@ -60,6 +60,7 @@ export class DefinitionRegistry {
   private polymorphicMap = new Map<string, Set<string>>();
   private swaggerMap: Map<string, OpenAPIV2.Document>;
   private unresolvedReferences = new Set<string>();
+  private referenceStack: string[] = [];
 
   constructor(map: Map<string, OpenAPIV2.Document>) {
     this.swaggerMap = map;
@@ -101,7 +102,14 @@ export class DefinitionRegistry {
       const kind = refResult.registry;
       let match = this.get(refResult.name, kind);
       if (match) {
-        return match;
+        if (this.referenceStack.includes(refResult.name)) {
+          // Just return a ref instead of circularReferences
+          return {
+            $circular: ref,
+          };
+        } else {
+          return this.#expand(match, refResult.name);
+        }
       } else {
         return {
           $ref: ref,
@@ -109,7 +117,7 @@ export class DefinitionRegistry {
       }
     } else {
       const expanded: any = {};
-      for (const [propName, propValue] of Object.entries(item)) {
+      for (const [propName, propValue] of Object.entries(item).toSorted()) {
         expanded[propName] = this.#expand(propValue);
       }
       return expanded;
@@ -132,7 +140,7 @@ export class DefinitionRegistry {
     if (allOf === undefined) {
       return base;
     }
-    const expAllOf = this.#expand(allOf);
+    const expAllOf = this.#expandArray(allOf);
     let allKeys = [...Object.keys(base)];
     for (const item of expAllOf) {
       allKeys = allKeys.concat(Object.keys(item));
@@ -158,20 +166,32 @@ export class DefinitionRegistry {
     return base;
   }
 
-  #expand(item: any): any {
-    if (typeof item !== "object") {
-      return item;
-    } else if (Array.isArray(item)) {
-      return this.#expandArray(item);
-    } else if (typeof item === "object") {
-      return this.#expandObject(item);
+  #expand(item: any, referenceName?: string): any {
+    if (referenceName !== undefined) {
+      if (this.referenceStack.includes(referenceName)) {
+        return item;
+      }
+      this.referenceStack.push(referenceName);
     }
+    let expanded: any;
+    if (typeof item !== "object") {
+      expanded = item;
+    } else if (Array.isArray(item)) {
+      expanded = this.#expandArray(item);
+    } else if (typeof item === "object") {
+      expanded = this.#expandObject(item);
+    }
+    if (referenceName !== undefined) {
+      this.referenceStack.pop();
+    }
+    return expanded;
   }
 
   #expandReferencesForCollection(collection: CollectionRegistry) {
+    this.referenceStack = [];
     for (const [key, value] of collection.data.entries()) {
-      for (const [_, propValue] of Object.entries(value)) {
-        this.#expand(propValue);
+      for (const [propName, propValue] of Object.entries(value)) {
+        value[propName] = this.#expand(propValue);
       }
       const expVal = this.#expandAllOf(value);
       collection.data.set(key, expVal);
@@ -224,24 +244,21 @@ export class DefinitionRegistry {
     this.data.definitions.add(key, data);
   }
 
-  #visitParameter(key: string, data: any) {
-    const inProp = data.in;
-    if (inProp === "body") {
-      const schema = data.schema;
-      if (schema !== undefined) {
-        const allOf = schema.allOf;
-        this.#processAllOf(allOf, key);
-      }
+  #visitSchema(data: any, name: string) {
+    if (data === undefined) {
+      return;
     }
+    const allOf = data.allOf;
+    this.#processAllOf(allOf, name);
+  }
+
+  #visitParameter(key: string, data: any) {
+    this.#visitSchema(data.schema, key);
     this.data.parameters.add(key, data);
   }
 
   #visitResponse(key: string, data: any) {
-    const schema = data.schema;
-    if (schema !== undefined) {
-      const allOf = schema.allOf;
-      this.#processAllOf(allOf, key);
-    }
+    this.#visitSchema(data.schema, key);
     this.data.responses.add(key, data);
   }
 

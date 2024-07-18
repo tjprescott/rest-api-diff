@@ -1,18 +1,8 @@
 import * as crypto from "crypto";
-import { OpenAPI, OpenAPIV2 } from "openapi-types";
+import { OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
 import { ParameterizedHost } from "./extensions/parameterized-host.js";
 import { isReference, parseReference } from "./util.js";
-
-/** Options which may be set on the parsing operation. */
-export interface ParseOptions {
-  /** The registry to resolve references from. */
-  registry?: RegistryKind;
-  /** The object that this element being parsed belongs to. */
-  objectName?: string;
-  /** Expand references and allOf  */
-  expand?: boolean;
-}
 
 /** A class for parsing Swagger files into an expanded, normalized form. */
 export class SwaggerParser {
@@ -194,7 +184,7 @@ export class SwaggerParser {
   }
 
   /** Parse the operation responses object. */
-  #parseResponses(value: any, options?: ParseOptions): any {
+  #parseResponses(value: any): any {
     let result: any = {};
     for (const [code, data] of Object.entries(value)) {
       if (code === "default") {
@@ -298,11 +288,18 @@ export class SwaggerParser {
       const ref = (value as any)["$ref"];
       const refResult = parseReference(ref);
       if (!refResult) {
-        // preseve the $ref and log an unresolved reference
-        this.defRegistry.logUnresolvedReference(value);
-        return {
-          $ref: ref,
-        };
+        if (ref.includes("examples")) {
+          // special case examples since they simply don't matter
+          return {
+            $example: ref,
+          };
+        } else {
+          // preseve the $ref and log an unresolved reference
+          this.defRegistry.logUnresolvedReference(value);
+          return {
+            $ref: ref,
+          };
+        }
       }
       const resolved = this.defRegistry.get(refResult.name, refResult.registry);
       if (!resolved) {

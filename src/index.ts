@@ -286,25 +286,24 @@ async function main() {
     JSON.stringify(rhsNew, null, 2)
   );
 
-  // FIXME: Fix this
-  // const groupViolations = args["group-violations"];
-  // if (allViolations.length === 0) {
-  //   console.log("No differences found");
-  //   return 0;
-  // }
-  // // write out the diff.json file based on the grouping preference
-  // const normalFilename = "diff.json";
-  // const inverseFilename = "diff-inv.json";
-  // if (groupViolations) {
-  //   writeGroupedViolations(allViolations, normalFilename, true);
-  //   writeGroupedViolations(results.noViolations, inverseFilename, false);
-  // } else {
-  //   console.warn(
-  //     `Found ${flaggedViolations.length} flagged violations and ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
-  //   );
-  //   writeFlatViolations(allViolations, normalFilename, true);
-  //   writeFlatViolations(results.noViolations, inverseFilename, false);
-  // }
+  const groupViolations = args["group-violations"];
+  if (allViolations.length === 0) {
+    console.log("No differences found");
+    return 0;
+  }
+  // write out the diff.json file based on the grouping preference
+  const normalFilename = "diff.json";
+  const inverseFilename = "diff-inv.json";
+  if (groupViolations) {
+    writeGroupedViolations(allViolations, normalFilename, true);
+    writeGroupedViolations(results.noViolations, inverseFilename, false);
+  } else {
+    console.warn(
+      `Found ${flaggedViolations.length} flagged violations and ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
+    );
+    writeFlatViolations(allViolations, normalFilename, true);
+    writeFlatViolations(results.noViolations, inverseFilename, false);
+  }
 
   // reportUnreferenced("lhs.json", lhsParser.defRegistry.getUnreferenced());
   // reportUnreferenced("rhs.json", rhsParser.defRegistry.getUnreferenced());
