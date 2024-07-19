@@ -19,7 +19,7 @@ export class CollectionRegistry {
     for (const [_, value] of data.entries()) {
       const subdata = (value as any)[key];
       if (subdata !== undefined) {
-        for (const [name, _] of Object.entries(subdata)) {
+        for (const [name, _] of Object.entries(subdata).toSorted()) {
           this.unreferenced.add(name);
         }
       }
@@ -38,9 +38,8 @@ export class CollectionRegistry {
 
   /** Mark an item as referenced. */
   countReference(name: string) {
-    if (this.unreferenced.has(name)) {
-      this.unreferenced.delete(name);
-    }
+    this.unreferenced.delete(name);
+    let test = "best";
   }
 
   /** Resolve list of unreferenced objects. */
@@ -93,6 +92,9 @@ export class DefinitionRegistry {
   #expandObject(item: any): any {
     if (isReference(item)) {
       const ref = item["$ref"];
+      if (ref.endsWith("AgeMetadata")) {
+        let test = "best";
+      }
       const refResult = parseReference(ref);
       if (!refResult) {
         return {
@@ -190,7 +192,7 @@ export class DefinitionRegistry {
   #expandReferencesForCollection(collection: CollectionRegistry) {
     this.referenceStack = [];
     for (const [key, value] of collection.data.entries()) {
-      for (const [propName, propValue] of Object.entries(value)) {
+      for (const [propName, propValue] of Object.entries(value).toSorted()) {
         value[propName] = this.#expand(propValue);
       }
       const expVal = this.#expandAllOf(value);
@@ -264,21 +266,27 @@ export class DefinitionRegistry {
 
   #gatherDefinitions(map: Map<string, any>) {
     for (const [_, fileData] of map.entries()) {
-      for (const [name, data] of Object.entries(fileData.definitions ?? {})) {
+      for (const [name, data] of Object.entries(
+        fileData.definitions ?? {}
+      ).toSorted()) {
         this.#visitDefinition(name, data);
       }
 
-      for (const [name, data] of Object.entries(fileData.parameters ?? {})) {
+      for (const [name, data] of Object.entries(
+        fileData.parameters ?? {}
+      ).toSorted()) {
         this.#visitParameter(name, data);
       }
 
-      for (const [name, data] of Object.entries(fileData.responses ?? {})) {
+      for (const [name, data] of Object.entries(
+        fileData.responses ?? {}
+      ).toSorted()) {
         this.#visitResponse(name, data);
       }
 
       for (const [name, data] of Object.entries(
         fileData.securityDefinitions ?? {}
-      )) {
+      ).toSorted()) {
         this.data.securityDefinitions.add(name, data);
       }
     }

@@ -87,6 +87,9 @@ A visual diff of `lhs-inv.json` and `rhs-inv.json` will show you only the differ
 also tell you which rule was applied that rendered the diff as a "non-violation". These can be useful to validate the rule logic and ensure it is not letting
 actually violations sneak through.
 
+Finally the tool will also output `lhs-raw.json` and `rhs-raw.json` which are the transformed files with no pruning or rule application. These can be useful for
+debugging purposes.
+
 ## Running against the REST API Specs Repo
 
 1. Ensure you have updated the dependencies in your fork by running `npm install` in the REST API specs repo root. You may need to delete `package-lock.json` first. Copy the path to the `node_modules/@typespec/compiler` package.

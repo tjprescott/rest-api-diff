@@ -71,6 +71,12 @@ const args = await yargs(hideBin(process.argv))
     coerce: (arg) => arg === "true",
     default: process.env.PRESERVE_DEFINITIONS,
   })
+  .options("verbose", {
+    type: "boolean",
+    describe: "Print verbose output.",
+    coerce: (arg) => arg === "true",
+    default: process.env.VERBOSE,
+  })
   .parse();
 
 await main();
@@ -221,21 +227,6 @@ function validatePath(path: string): boolean {
   }
 }
 
-/** Reports on any unreferenced items unless --preserve-definitions is set. */
-function reportUnreferenced(key: string, data: Map<RegistryKind, string[]>) {
-  if (args["preserve-definitions"]) {
-    return;
-  }
-  for (const [kind, names] of data.entries()) {
-    if (names.length === 0) {
-      continue;
-    }
-    console.warn(
-      `Unreferenced ${RegistryKind[kind]} found in ${key}: ${names.join(", ")}`
-    );
-  }
-}
-
 async function main() {
   const in1 = args.lhs;
   const in2 = args.rhs;
@@ -277,6 +268,16 @@ async function main() {
     JSON.stringify(rhsInv, null, 2)
   );
 
+  // write the raw files to output for debugging purposes
+  fs.writeFileSync(
+    `${args["output-folder"]}/lhs-raw.json`,
+    JSON.stringify(lhs, null, 2)
+  );
+  fs.writeFileSync(
+    `${args["output-folder"]}/rhs-raw.json`,
+    JSON.stringify(rhs, null, 2)
+  );
+
   // prune the documents of any paths that are not relevant and
   // output them for visual diffing.
   const [lhsNew, rhsNew] = pruneDocuments(lhs, rhs, results.noViolations);
@@ -288,6 +289,16 @@ async function main() {
     `${args["output-folder"]}/rhs.json`,
     JSON.stringify(rhsNew, null, 2)
   );
+
+  // Report unresolved and unreferenced objects
+  if (args["verbose"]) {
+    lhsParser.reportUnresolvedReferences();
+    rhsParser.reportUnresolvedReferences();
+    if (!args["preserve-definitions"]) {
+      lhsParser.reportUnreferencedObjects();
+      rhsParser.reportUnreferencedObjects();
+    }
+  }
 
   const groupViolations = args["group-violations"];
   if (allViolations.length === 0) {
@@ -301,15 +312,13 @@ async function main() {
     writeGroupedViolations(allViolations, normalFilename, true);
     writeGroupedViolations(results.noViolations, inverseFilename, false);
   } else {
+    // TODO: Summarize output
     console.warn(
       `Found ${flaggedViolations.length} flagged violations and ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
     );
     writeFlatViolations(allViolations, normalFilename, true);
     writeFlatViolations(results.noViolations, inverseFilename, false);
   }
-
-  // reportUnreferenced("lhs.json", lhsParser.defRegistry.getUnreferenced());
-  // reportUnreferenced("rhs.json", rhsParser.defRegistry.getUnreferenced());
 }
 
 async function writeGroupedViolations(

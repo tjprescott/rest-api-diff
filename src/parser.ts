@@ -69,11 +69,11 @@ export class SwaggerParser {
       if (!this.result.paths) {
         this.result.paths = {};
       }
-      for (const [path, data] of Object.entries(newPaths)) {
+      for (const [path, data] of Object.entries(newPaths).toSorted()) {
         this.result.paths[path] = data;
       }
 
-      for (const [key, val] of Object.entries(data)) {
+      for (const [key, val] of Object.entries(data).toSorted()) {
         switch (key) {
           case "swagger":
           case "info":
@@ -146,8 +146,7 @@ export class SwaggerParser {
   /** Parse a response object. */
   #parseResponse(value: any): any {
     let result: any = {};
-    const sortedEntries = Object.entries(value).sort();
-    for (const [key, val] of sortedEntries) {
+    for (const [key, val] of Object.entries(value).toSorted()) {
       if (key === "schema") {
         const expanded = this.parseNode(val);
         result[key] = expanded;
@@ -186,7 +185,7 @@ export class SwaggerParser {
   /** Parse the operation responses object. */
   #parseResponses(value: any): any {
     let result: any = {};
-    for (const [code, data] of Object.entries(value)) {
+    for (const [code, data] of Object.entries(value).toSorted()) {
       if (code === "default") {
         // Don't expand the default response. We will handle this in a special way.
         const errorName = this.#parseErrorName(data);
@@ -210,8 +209,7 @@ export class SwaggerParser {
     let result: any = {};
     value["consumes"] = value["consumes"] ?? this.defaultConsumes;
     value["produces"] = value["produces"] ?? this.defaultProduces;
-    const sortedEntries = Object.entries(value).sort();
-    for (const [key, val] of sortedEntries) {
+    for (const [key, val] of Object.entries(value).toSorted()) {
       if (key === "parameters") {
         // mix in any parameters from parameterized host
         const hostParams = this.parameterizedHost?.parameters ?? [];
@@ -249,8 +247,7 @@ export class SwaggerParser {
   /** Parse each verb/operation pair. */
   #parseVerbs(value: any): any {
     let result: any = {};
-    const sortedVerbs = Object.entries(value).sort();
-    for (const [verb, data] of sortedVerbs) {
+    for (const [verb, data] of Object.entries(value).toSorted()) {
       result[verb] = this.#parseOperation(data);
     }
     return result;
@@ -259,8 +256,7 @@ export class SwaggerParser {
   /** Pare the entire Paths object. */
   parsePaths(value: any): any {
     let result: any = {};
-    const sortedPaths = Object.entries(value).sort();
-    for (const [operationPath, pathData] of sortedPaths) {
+    for (const [operationPath, pathData] of Object.entries(value).toSorted()) {
       // normalize the path to coerce the naming convention
       const normalizedPath = this.#normalizePath(operationPath);
       result[normalizedPath] = this.#parseVerbs(pathData);
@@ -310,16 +306,16 @@ export class SwaggerParser {
         };
       }
       this.defRegistry.countReference(refResult.name, refResult.registry);
-      const derivedClasses = resolved["$derivedClasses"];
-      for (const item of derivedClasses ?? []) {
-        this.defRegistry.countReference(item, refResult.registry);
-      }
-      return resolved;
+      return this.#parseObject(resolved);
     }
     const result: any = {};
     // visit each key in the object in sorted order
-    const sortedEntries = Object.entries(value).sort();
-    for (const [key, val] of sortedEntries) {
+    for (const [key, val] of Object.entries(value).toSorted()) {
+      if (key === "$derivedClasses") {
+        for (const name of val as string[]) {
+          this.defRegistry.countReference(name, RegistryKind.Definition);
+        }
+      }
       result[key] = this.parseNode(val);
     }
     return result;
