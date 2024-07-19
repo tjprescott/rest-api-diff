@@ -299,16 +299,16 @@ export class DefinitionRegistry {
   }
 
   /** Get a collection. */
-  getCollection(registry: RegistryKind): Map<string, any> {
+  getCollection(registry: RegistryKind): any {
     switch (registry) {
       case RegistryKind.Definition:
-        return this.data.definitions.data;
+        return Object.fromEntries(this.data.definitions.data);
       case RegistryKind.Parameter:
-        return this.data.parameters.data;
+        return Object.fromEntries(this.data.parameters.data);
       case RegistryKind.Response:
-        return this.data.responses.data;
+        return Object.fromEntries(this.data.responses.data);
       case RegistryKind.SecurityDefinition:
-        return this.data.securityDefinitions.data;
+        return Object.fromEntries(this.data.securityDefinitions.data);
     }
   }
 

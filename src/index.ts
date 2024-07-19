@@ -37,13 +37,15 @@ const args = await yargs(hideBin(process.argv))
     type: "boolean",
     describe:
       "If TypeSpec files are found, attempt to compile the TypeSpec to Swagger using @typespec-autorest.",
-    default: process.env.COMPILE_TSP === "true",
+    coerce: (arg) => arg === "true",
+    default: process.env.COMPILE_TSP,
   })
   .options("group-violations", {
     type: "boolean",
     describe:
       "Group violations by rule name. If false, will output all violations in a flat collection.",
-    default: process.env.GROUP_VIOLATIONS === "true",
+    coerce: (arg) => arg === "true",
+    default: process.env.GROUP_VIOLATIONS,
   })
   .options("output-folder", {
     type: "string",
@@ -66,6 +68,7 @@ const args = await yargs(hideBin(process.argv))
     type: "boolean",
     describe:
       "Preserve defintions, parameters, responses, and securityDefinitions in the output. ",
+    coerce: (arg) => arg === "true",
     default: process.env.PRESERVE_DEFINITIONS,
   })
   .parse();
@@ -373,8 +376,8 @@ function pruneDocuments(
   differences: DiffItem[] | undefined
 ): [OpenAPIV2.Document, OpenAPIV2.Document] {
   // deep copy the documents
-  let lhs = JSON.parse(JSON.stringify(inputLhs)) as OpenAPIV2.Document;
-  let rhs = JSON.parse(JSON.stringify(inputRhs)) as OpenAPIV2.Document;
+  let lhs = JSON.parse(JSON.stringify(inputLhs));
+  let rhs = JSON.parse(JSON.stringify(inputRhs));
 
   for (const diff of differences ?? []) {
     const path = diff.diff.path;
