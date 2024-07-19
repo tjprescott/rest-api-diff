@@ -91,31 +91,31 @@ export class DefinitionRegistry {
 
   #expandObject(item: any): any {
     if (isReference(item)) {
+      const itemCopy = JSON.parse(JSON.stringify(item));
       const ref = item["$ref"];
-      if (ref.endsWith("AgeMetadata")) {
-        let test = "best";
-      }
+      delete itemCopy["$ref"];
+
       const refResult = parseReference(ref);
       if (!refResult) {
-        return {
-          $ref: ref,
-        };
+        return item;
       }
       const kind = refResult.registry;
       let match = this.get(refResult.name, kind);
       if (match) {
         if (this.referenceStack.includes(refResult.name)) {
-          // Just return a ref instead of circularReferences
           return {
             $circular: ref,
           };
         } else {
-          return this.#expand(match, refResult.name);
+          let matchCopy = JSON.parse(JSON.stringify(match));
+          // spread in any overriding properties
+          for (const [key, value] of Object.entries(itemCopy).toSorted()) {
+            matchCopy[key] = value;
+          }
+          return this.#expand(matchCopy, refResult.name);
         }
       } else {
-        return {
-          $ref: ref,
-        };
+        return item;
       }
     } else {
       const expanded: any = {};
