@@ -120,8 +120,8 @@ export class DefinitionRegistry {
       }
     } else {
       const expanded: any = {};
+      this.#expandAllOf(item);
       for (const [propName, propValue] of Object.entries(item).toSorted()) {
-        this.#expandAllOf(propValue);
         expanded[propName] = this.#expand(propValue);
       }
       return expanded;
