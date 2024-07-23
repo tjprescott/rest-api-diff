@@ -300,7 +300,7 @@ export class SwaggerParser {
           $ref: ref,
         };
       }
-      this.defRegistry.countReference(refResult.name);
+      this.defRegistry.countReference(refResult.name, refResult.registry);
       const references = this.defRegistry.getReferences(refResult.name);
       for (const ref of references) {
         this.defRegistry.countReference(ref, refResult.registry);

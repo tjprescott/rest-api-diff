@@ -224,8 +224,13 @@ export class DefinitionRegistry {
 
   #expandReferenceMap() {
     for (const [key, values] of this.referenceMap.entries()) {
+      if (key === "AnalyzeTextTaskResult") {
+        let test = "best";
+      }
       const expanded = new Set<string>();
       this.#expandSetWithItems(expanded, values);
+      const derivedClasses = this.polymorphicMap.get(key);
+      this.#expandSetWithItems(expanded, derivedClasses);
       this.referenceMap.set(key, expanded);
     }
   }
@@ -381,10 +386,7 @@ export class DefinitionRegistry {
   }
 
   /** Logs a reference to an item. */
-  countReference(name: string, registry?: RegistryKind) {
-    if (registry === undefined) {
-      return;
-    }
+  countReference(name: string, registry: RegistryKind) {
     switch (registry) {
       case RegistryKind.Definition:
         this.data.definitions.countReference(name);

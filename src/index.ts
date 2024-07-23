@@ -299,10 +299,15 @@ async function main() {
 
   // Report unresolved and unreferenced objects
   if (args["verbose"]) {
+    console.warn("=== LEFT-HAND SIDE ===");
     lhsParser.reportUnresolvedReferences();
-    rhsParser.reportUnresolvedReferences();
     if (!args["preserve-definitions"]) {
       lhsParser.reportUnreferencedObjects();
+    }
+
+    console.warn("\n=== RIGHT-HAND SIDE ===");
+    rhsParser.reportUnresolvedReferences();
+    if (!args["preserve-definitions"]) {
       rhsParser.reportUnreferencedObjects();
     }
   }
@@ -333,7 +338,8 @@ async function main() {
       rhsParser.defRegistry.getUnresolvedReferences().length,
     unreferencedObjects: rhsParser.defRegistry.getUnreferencedTotal(),
   };
-  console.warn("== ISSUES FOUND! ==");
+  console.warn("\n== ISSUES FOUND! ==\n");
+  const preserveDefinitions = args["preserve-definitions"];
   if (summary.flaggedViolations) {
     if (summary.rulesViolated) {
       console.warn(
@@ -349,18 +355,23 @@ async function main() {
   if (summary.unresolvedReferences) {
     console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
   }
-  if (summary.unreferencedObjects) {
+  if (!preserveDefinitions && summary.unreferencedObjects) {
     console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
   }
   console.warn("\n");
   console.warn(
     `See '${outputFolder}' for details. See 'lhs.json', 'rhs.json' and 'diff.json'.`
   );
-  if (summary.unresolvedReferences || summary.unreferencedObjects) {
+  if (
+    !preserveDefinitions &&
+    (summary.unresolvedReferences || summary.unreferencedObjects)
+  ) {
     console.warn(
-      "Try running with `--preserve-defintions` to include unreferenced definitions in the comparison,"
+      "Try running with `--preserve-defintions` to include unreferenced definitions in the comparison"
     );
-    console.warn("or run with `--verbose` to see more detailed information.");
+    if (!args["verbose"]) {
+      console.warn("or run with `--verbose` to see more detailed information.");
+    }
   }
 }
 
