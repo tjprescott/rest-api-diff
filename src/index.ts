@@ -8,9 +8,16 @@ const { diff } = pkg;
 import { OpenAPIV2 } from "openapi-types";
 import { exec } from "child_process";
 import * as dotenv from "dotenv";
-import { RegistryKind } from "./definitions.js";
 
 dotenv.config();
+
+interface ResultSummary {
+  flaggedViolations: number;
+  rulesViolated: number | undefined;
+  assumedViolations: number;
+  unresolvedReferences: number;
+  unreferencedObjects: number;
+}
 
 const typespecOutputDir = `${process.cwd()}/tsp-output`;
 
@@ -309,22 +316,57 @@ async function main() {
   const normalFilename = "diff.json";
   const inverseFilename = "diff-inv.json";
   if (groupViolations) {
-    writeGroupedViolations(allViolations, normalFilename, true);
-    writeGroupedViolations(results.noViolations, inverseFilename, false);
+    writeGroupedViolations(allViolations, normalFilename);
+    writeGroupedViolations(results.noViolations, inverseFilename);
   } else {
-    // TODO: Summarize output
+    writeFlatViolations(allViolations, normalFilename);
+    writeFlatViolations(results.noViolations, inverseFilename);
+  }
+  // add up the length of each array
+  const summary: ResultSummary = {
+    flaggedViolations: flaggedViolations.length,
+    assumedViolations: assumedViolations.length,
+    rulesViolated: groupViolations
+      ? new Set(allViolations.map((x) => x.ruleName)).size
+      : undefined,
+    unresolvedReferences:
+      rhsParser.defRegistry.getUnresolvedReferences().length,
+    unreferencedObjects: rhsParser.defRegistry.getUnreferencedTotal(),
+  };
+  console.warn("== ISSUES FOUND! ==");
+  if (summary.flaggedViolations) {
+    if (summary.rulesViolated) {
+      console.warn(
+        `Flagged Violations: ${summary.flaggedViolations} across ${summary.rulesViolated} rules`
+      );
+    } else {
+      console.warn(`Flagged Violations: ${summary.flaggedViolations}`);
+    }
+  }
+  if (summary.assumedViolations) {
+    console.warn(`Assumed Violations: ${summary.assumedViolations}`);
+  }
+  if (summary.unresolvedReferences) {
+    console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
+  }
+  if (summary.unreferencedObjects) {
+    console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
+  }
+  console.warn("\n");
+  console.warn(
+    `See '${outputFolder}' for details. See 'lhs.json', 'rhs.json' and 'diff.json'.`
+  );
+  if (summary.unresolvedReferences || summary.unreferencedObjects) {
     console.warn(
-      `Found ${flaggedViolations.length} flagged violations and ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
+      "Try running with `--preserve-defintions` to include unreferenced definitions in the comparison,"
     );
-    writeFlatViolations(allViolations, normalFilename, true);
-    writeFlatViolations(results.noViolations, inverseFilename, false);
+    console.warn("or run with `--verbose` to see more detailed information.");
   }
 }
 
 async function writeGroupedViolations(
   differences: DiffItem[],
-  filename: string,
-  showWarning: boolean
+  filename: string
 ) {
   const defaultRule = "assumedViolation";
   const groupedDiff: { [key: string]: DiffItem[] } = {};
@@ -335,22 +377,11 @@ async function writeGroupedViolations(
     }
     groupedDiff[ruleName]?.push(diff);
   }
-  const assumedViolations = groupedDiff[defaultRule] ?? [];
-  const ruleViolationCount = differences.length - assumedViolations.length;
-  if (showWarning) {
-    console.warn(
-      `Found ${ruleViolationCount} violations across ${Object.keys(groupedDiff).length - 1} rules, with ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
-    );
-  }
   const diffPath = `${args["output-folder"]}/${filename}`;
   fs.writeFileSync(diffPath, JSON.stringify(groupedDiff, null, 2));
 }
 
-async function writeFlatViolations(
-  differences: DiffItem[],
-  filename: string,
-  showWarning: boolean
-) {
+async function writeFlatViolations(differences: DiffItem[], filename: string) {
   const diffPath = `${args["output-folder"]}/${filename}`;
   fs.writeFileSync(diffPath, JSON.stringify(differences, null, 2));
 }

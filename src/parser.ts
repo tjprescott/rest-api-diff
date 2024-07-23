@@ -147,12 +147,7 @@ export class SwaggerParser {
   #parseResponse(value: any): any {
     let result: any = {};
     for (const [key, val] of Object.entries(value).toSorted()) {
-      if (key === "schema") {
-        const expanded = this.parseNode(val);
-        result[key] = expanded;
-      } else {
-        result[key] = this.parseNode(val);
-      }
+      result[key] = this.parseNode(val);
     }
     return result;
   }
@@ -305,17 +300,16 @@ export class SwaggerParser {
           $ref: ref,
         };
       }
-      this.defRegistry.countReference(refResult.name, refResult.registry);
+      this.defRegistry.countReference(refResult.name);
+      const references = this.defRegistry.getReferences(refResult.name);
+      for (const ref of references) {
+        this.defRegistry.countReference(ref, refResult.registry);
+      }
       return this.#parseObject(resolved);
     }
     const result: any = {};
     // visit each key in the object in sorted order
     for (const [key, val] of Object.entries(value).toSorted()) {
-      if (key === "$derivedClasses") {
-        for (const name of val as string[]) {
-          this.defRegistry.countReference(name, RegistryKind.Definition);
-        }
-      }
       result[key] = this.parseNode(val);
     }
     return result;

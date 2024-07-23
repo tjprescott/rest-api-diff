@@ -1,5 +1,6 @@
 import { OpenAPIV2 } from "openapi-types";
 import { isReference, parseReference } from "./util.js";
+import assert from "assert";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {
@@ -39,7 +40,6 @@ export class CollectionRegistry {
   /** Mark an item as referenced. */
   countReference(name: string) {
     this.unreferenced.delete(name);
-    let test = "best";
   }
 
   /** Resolve list of unreferenced objects. */
@@ -60,6 +60,7 @@ export class DefinitionRegistry {
   private swaggerMap: Map<string, OpenAPIV2.Document>;
   private unresolvedReferences = new Set<string>();
   private referenceStack: string[] = [];
+  private referenceMap = new Map<string, Set<string>>();
 
   constructor(map: Map<string, OpenAPIV2.Document>) {
     this.swaggerMap = map;
@@ -120,6 +121,7 @@ export class DefinitionRegistry {
     } else {
       const expanded: any = {};
       for (const [propName, propValue] of Object.entries(item).toSorted()) {
+        this.#expandAllOf(propValue);
         expanded[propName] = this.#expand(propValue);
       }
       return expanded;
@@ -168,12 +170,27 @@ export class DefinitionRegistry {
     return base;
   }
 
+  #updateReferenceMap(items?: string[]) {
+    if (!this.referenceStack.length) {
+      return;
+    }
+    const key = this.referenceStack[0];
+    if (!this.referenceMap.has(key)) {
+      this.referenceMap.set(key, new Set());
+    }
+    const last = this.referenceStack[this.referenceStack.length - 1];
+    if (key !== last) {
+      this.referenceMap.get(key)!.add(last);
+    }
+  }
+
   #expand(item: any, referenceName?: string): any {
     if (referenceName !== undefined) {
       if (this.referenceStack.includes(referenceName)) {
         return item;
       }
       this.referenceStack.push(referenceName);
+      this.#updateReferenceMap();
     }
     let expanded: any;
     if (typeof item !== "object") {
@@ -189,14 +206,35 @@ export class DefinitionRegistry {
     return expanded;
   }
 
+  #expandSetWithItems(set: Set<string>, values: Set<string> | undefined) {
+    if (values === undefined) {
+      return;
+    }
+    for (const value of values) {
+      if (set.has(value)) {
+        continue;
+      }
+      set.add(value);
+      const references = this.referenceMap.get(value);
+      this.#expandSetWithItems(set, references);
+      const derived = this.polymorphicMap.get(value);
+      this.#expandSetWithItems(set, derived);
+    }
+  }
+
+  #expandReferenceMap() {
+    for (const [key, values] of this.referenceMap.entries()) {
+      const expanded = new Set<string>();
+      this.#expandSetWithItems(expanded, values);
+      this.referenceMap.set(key, expanded);
+    }
+  }
+
   #expandReferencesForCollection(collection: CollectionRegistry) {
     this.referenceStack = [];
     for (const [key, value] of collection.data.entries()) {
-      for (const [propName, propValue] of Object.entries(value).toSorted()) {
-        value[propName] = this.#expand(propValue);
-      }
-      const expVal = this.#expandAllOf(value);
-      collection.data.set(key, expVal);
+      let expanded = this.#expand(value, key);
+      collection.data.set(key, expanded);
     }
     // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
     for (const [_, value] of collection.data.entries()) {
@@ -213,6 +251,7 @@ export class DefinitionRegistry {
         value["$anyOf"].push(derivedClass);
       }
     }
+    this.#expandReferenceMap();
   }
 
   #expandReferences() {
@@ -398,5 +437,20 @@ export class DefinitionRegistry {
       }
     }
     return map;
+  }
+
+  /** Returns the total number of unreferenced definitions. */
+  getUnreferencedTotal(): number {
+    const map = this.getUnreferenced();
+    let total = 0;
+    for (const value of map.values()) {
+      total += value.length;
+    }
+    return total;
+  }
+
+  /** Returns a list of references from the definition-gathering phase. */
+  getReferences(key: string): string[] {
+    return Array.from(this.referenceMap.get(key) ?? []);
   }
 }
