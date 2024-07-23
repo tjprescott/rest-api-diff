@@ -8,9 +8,16 @@ const { diff } = pkg;
 import { OpenAPIV2 } from "openapi-types";
 import { exec } from "child_process";
 import * as dotenv from "dotenv";
-import { RegistryKind } from "./definitions.js";
 
 dotenv.config();
+
+interface ResultSummary {
+  flaggedViolations: number;
+  rulesViolated: number | undefined;
+  assumedViolations: number;
+  unresolvedReferences: number;
+  unreferencedObjects: number;
+}
 
 const typespecOutputDir = `${process.cwd()}/tsp-output`;
 
@@ -37,13 +44,15 @@ const args = await yargs(hideBin(process.argv))
     type: "boolean",
     describe:
       "If TypeSpec files are found, attempt to compile the TypeSpec to Swagger using @typespec-autorest.",
-    default: process.env.COMPILE_TSP === "true",
+    coerce: (arg) => arg === "true",
+    default: process.env.COMPILE_TSP,
   })
   .options("group-violations", {
     type: "boolean",
     describe:
       "Group violations by rule name. If false, will output all violations in a flat collection.",
-    default: process.env.GROUP_VIOLATIONS === "true",
+    coerce: (arg) => arg === "true",
+    default: process.env.GROUP_VIOLATIONS,
   })
   .options("output-folder", {
     type: "string",
@@ -66,7 +75,14 @@ const args = await yargs(hideBin(process.argv))
     type: "boolean",
     describe:
       "Preserve defintions, parameters, responses, and securityDefinitions in the output. ",
+    coerce: (arg) => arg === "true",
     default: process.env.PRESERVE_DEFINITIONS,
+  })
+  .options("verbose", {
+    type: "boolean",
+    describe: "Print verbose output.",
+    coerce: (arg) => arg === "true",
+    default: process.env.VERBOSE,
   })
   .parse();
 
@@ -218,29 +234,14 @@ function validatePath(path: string): boolean {
   }
 }
 
-/** Reports on any unreferenced items unless --preserve-definitions is set. */
-function reportUnreferenced(key: string, data: Map<RegistryKind, string[]>) {
-  if (args["preserve-definitions"]) {
-    return;
-  }
-  for (const [kind, names] of data.entries()) {
-    if (names.length === 0) {
-      continue;
-    }
-    console.warn(
-      `Unreferenced ${RegistryKind[kind]} found in ${key}: ${names.join(", ")}`
-    );
-  }
-}
-
 async function main() {
   const in1 = args.lhs;
   const in2 = args.rhs;
 
   let lhsParser = new SwaggerParser(await loadPaths(in1));
   let rhsParser = new SwaggerParser(await loadPaths(in2));
-  const lhs = lhsParser.asJSON();
-  const rhs = rhsParser.asJSON();
+  const lhs = lhsParser.parse().asJSON();
+  const rhs = rhsParser.parse().asJSON();
 
   // sort the diffs into three buckets: flagged violations, assumed violations, and no violations
   const results = processDiff(diff(lhs, rhs), lhs, rhs);
@@ -274,6 +275,16 @@ async function main() {
     JSON.stringify(rhsInv, null, 2)
   );
 
+  // write the raw files to output for debugging purposes
+  fs.writeFileSync(
+    `${args["output-folder"]}/lhs-raw.json`,
+    JSON.stringify(lhs, null, 2)
+  );
+  fs.writeFileSync(
+    `${args["output-folder"]}/rhs-raw.json`,
+    JSON.stringify(rhs, null, 2)
+  );
+
   // prune the documents of any paths that are not relevant and
   // output them for visual diffing.
   const [lhsNew, rhsNew] = pruneDocuments(lhs, rhs, results.noViolations);
@@ -286,6 +297,21 @@ async function main() {
     JSON.stringify(rhsNew, null, 2)
   );
 
+  // Report unresolved and unreferenced objects
+  if (args["verbose"]) {
+    console.warn("=== LEFT-HAND SIDE ===");
+    lhsParser.reportUnresolvedReferences();
+    if (!args["preserve-definitions"]) {
+      lhsParser.reportUnreferencedObjects();
+    }
+
+    console.warn("\n=== RIGHT-HAND SIDE ===");
+    rhsParser.reportUnresolvedReferences();
+    if (!args["preserve-definitions"]) {
+      rhsParser.reportUnreferencedObjects();
+    }
+  }
+
   const groupViolations = args["group-violations"];
   if (allViolations.length === 0) {
     console.log("No differences found");
@@ -295,24 +321,63 @@ async function main() {
   const normalFilename = "diff.json";
   const inverseFilename = "diff-inv.json";
   if (groupViolations) {
-    writeGroupedViolations(allViolations, normalFilename, true);
-    writeGroupedViolations(results.noViolations, inverseFilename, false);
+    writeGroupedViolations(allViolations, normalFilename);
+    writeGroupedViolations(results.noViolations, inverseFilename);
   } else {
-    console.warn(
-      `Found ${flaggedViolations.length} flagged violations and ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
-    );
-    writeFlatViolations(allViolations, normalFilename, true);
-    writeFlatViolations(results.noViolations, inverseFilename, false);
+    writeFlatViolations(allViolations, normalFilename);
+    writeFlatViolations(results.noViolations, inverseFilename);
   }
-
-  reportUnreferenced("lhs.json", lhsParser.definitions.getUnreferenced());
-  reportUnreferenced("rhs.json", rhsParser.definitions.getUnreferenced());
+  // add up the length of each array
+  const summary: ResultSummary = {
+    flaggedViolations: flaggedViolations.length,
+    assumedViolations: assumedViolations.length,
+    rulesViolated: groupViolations
+      ? new Set(allViolations.map((x) => x.ruleName)).size
+      : undefined,
+    unresolvedReferences:
+      rhsParser.defRegistry.getUnresolvedReferences().length,
+    unreferencedObjects: rhsParser.defRegistry.getUnreferencedTotal(),
+  };
+  console.warn("\n== ISSUES FOUND! ==\n");
+  const preserveDefinitions = args["preserve-definitions"];
+  if (summary.flaggedViolations) {
+    if (summary.rulesViolated) {
+      console.warn(
+        `Flagged Violations: ${summary.flaggedViolations} across ${summary.rulesViolated} rules`
+      );
+    } else {
+      console.warn(`Flagged Violations: ${summary.flaggedViolations}`);
+    }
+  }
+  if (summary.assumedViolations) {
+    console.warn(`Assumed Violations: ${summary.assumedViolations}`);
+  }
+  if (summary.unresolvedReferences) {
+    console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
+  }
+  if (!preserveDefinitions && summary.unreferencedObjects) {
+    console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
+  }
+  console.warn("\n");
+  console.warn(
+    `See '${outputFolder}' for details. See 'lhs.json', 'rhs.json' and 'diff.json'.`
+  );
+  if (
+    !preserveDefinitions &&
+    (summary.unresolvedReferences || summary.unreferencedObjects)
+  ) {
+    console.warn(
+      "Try running with `--preserve-defintions` to include unreferenced definitions in the comparison"
+    );
+    if (!args["verbose"]) {
+      console.warn("or run with `--verbose` to see more detailed information.");
+    }
+  }
 }
 
 async function writeGroupedViolations(
   differences: DiffItem[],
-  filename: string,
-  showWarning: boolean
+  filename: string
 ) {
   const defaultRule = "assumedViolation";
   const groupedDiff: { [key: string]: DiffItem[] } = {};
@@ -323,22 +388,11 @@ async function writeGroupedViolations(
     }
     groupedDiff[ruleName]?.push(diff);
   }
-  const assumedViolations = groupedDiff[defaultRule] ?? [];
-  const ruleViolationCount = differences.length - assumedViolations.length;
-  if (showWarning) {
-    console.warn(
-      `Found ${ruleViolationCount} violations across ${Object.keys(groupedDiff).length - 1} rules, with ${assumedViolations.length} assumed violations! See diff.json, lhs.json, and rhs.json for details.`
-    );
-  }
   const diffPath = `${args["output-folder"]}/${filename}`;
   fs.writeFileSync(diffPath, JSON.stringify(groupedDiff, null, 2));
 }
 
-async function writeFlatViolations(
-  differences: DiffItem[],
-  filename: string,
-  showWarning: boolean
-) {
+async function writeFlatViolations(differences: DiffItem[], filename: string) {
   const diffPath = `${args["output-folder"]}/${filename}`;
   fs.writeFileSync(diffPath, JSON.stringify(differences, null, 2));
 }
@@ -373,8 +427,8 @@ function pruneDocuments(
   differences: DiffItem[] | undefined
 ): [OpenAPIV2.Document, OpenAPIV2.Document] {
   // deep copy the documents
-  let lhs = JSON.parse(JSON.stringify(inputLhs)) as OpenAPIV2.Document;
-  let rhs = JSON.parse(JSON.stringify(inputRhs)) as OpenAPIV2.Document;
+  let lhs = JSON.parse(JSON.stringify(inputLhs));
+  let rhs = JSON.parse(JSON.stringify(inputRhs));
 
   for (const diff of differences ?? []) {
     const path = diff.diff.path;
