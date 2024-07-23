@@ -244,6 +244,7 @@ export class DefinitionRegistry {
     // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
     for (const [_, value] of collection.data.entries()) {
       const derivedClasses = value["$derivedClasses"];
+      delete value["$derivedClasses"];
       if (!derivedClasses) {
         continue;
       }
@@ -254,6 +255,10 @@ export class DefinitionRegistry {
           throw new Error(`Derived class ${derived} not found.`);
         }
         value["$anyOf"].push(derivedClass);
+      }
+      // a union of one thing is not important
+      if (value["$anyOf"].length < 2) {
+        delete value["$anyOf"];
       }
     }
     this.#expandReferenceMap();
