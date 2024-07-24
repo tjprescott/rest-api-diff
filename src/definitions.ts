@@ -449,6 +449,9 @@ export class DefinitionRegistry {
   /** Returns the total number of unreferenced definitions. */
   getUnreferencedTotal(): number {
     const map = this.getUnreferenced();
+    // ignore SecurityDefinitions because we don't use them in Azure so
+    // it doesn't matter if they are unreferenced
+    map.delete(RegistryKind.SecurityDefinition);
     let total = 0;
     for (const value of map.values()) {
       total += value.length;

@@ -127,6 +127,9 @@ export class SwaggerParser {
 
   reportUnreferencedObjects(): void {
     const unreferencedDefinitions = this.defRegistry.getUnreferenced();
+    // We don't care about unused security definitions because we don't really
+    // use them in Azure. (We will still diff them though)
+    unreferencedDefinitions.delete(RegistryKind.SecurityDefinition);
     if (unreferencedDefinitions.size > 0) {
       let total = 0;
       for (const value of unreferencedDefinitions.values()) {
