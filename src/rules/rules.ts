@@ -12,6 +12,7 @@ import { compareXMsEnumRule } from "./compare-x-ms-enum.js";
 import { compareResponseRequiredRule } from "./compare-response-required.js";
 import { compareRequestRequiredRule } from "./compare-request-required.js";
 import { ignoreSwaggerDefintionsRule } from "./ignore-swagger-definitions.js";
+import { compareXMsIdentifiersRule } from "./compare-x-ms-identifiers.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -40,6 +41,7 @@ export function getApplicableRules(args: any): RuleSignature[] {
     ignoreApiVersionMinLengthRule,
     ignoreFormatUriRule,
     ignoreNextLinkFormatUriRule,
+    compareXMsIdentifiersRule,
     compareErrorsRule,
     compareXMsEnumRule,
     flagTypeDifferencesRule,
