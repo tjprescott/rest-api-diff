@@ -4,6 +4,7 @@ import { RuleResult } from "./rules.js";
 const propertValuesToIgnore: Map<string, any> = new Map([
   ["x-nullable", false],
   ["readOnly", true],
+  ["additionalProperties", false],
 ]);
 
 /**

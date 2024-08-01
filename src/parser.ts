@@ -150,7 +150,17 @@ export class SwaggerParser {
   #parseResponse(value: any): any {
     let result: any = {};
     for (const [key, val] of Object.entries(value).toSorted()) {
-      result[key] = this.parseNode(val);
+      if (key === "headers") {
+        result[key] = {};
+        for (const [headerKey, headerVal] of Object.entries(
+          val as object
+        ).toSorted()) {
+          // normalize header keys to lowercase
+          result[key][headerKey.toLowerCase()] = this.parseNode(headerVal);
+        }
+      } else {
+        result[key] = this.parseNode(val);
+      }
     }
     return result;
   }
@@ -230,6 +240,9 @@ export class SwaggerParser {
           // client.
           if (param.in === "path") {
             param.name = this.#normalizeName(param.name);
+          } else if (param.in === "header") {
+            // normalize header keys to lowercase
+            param.name = param.name.toLowerCase();
           }
         }
         result[key] = sorted;
