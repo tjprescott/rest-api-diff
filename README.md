@@ -1,10 +1,15 @@
-# OpenAPI Diff
+# REST API Diff
 
 This tool is intended to be used to compare two OpenAPI 2.0 (Swagger) specifications to determine if there are
 relevant differences that affect the API contract. The primary use case is to compare a hand-written specification
 against the one generated from TypeSpec to determine if the TypeSpec accurately describes the same API contract.
 
 ## Install
+
+1. Run `npm install @azure-tools/rest-api-diff`
+2. If you want to make use of TypeSpec compilation features, `npm install @typespec/compiler`
+
+## Dev Install
 
 1. Clone this repository
 2. Run `npm install`
