@@ -1,6 +1,6 @@
 {
   "name": "@azure-tools/rest-api-diff",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Compares two Swagger definitions to identify relevant differences.",
   "type": "module",
   "scripts": {
