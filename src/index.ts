@@ -19,11 +19,19 @@ interface ResultSummary {
   unreferencedObjects: number;
 }
 
+// extract package version from package.json
+const packageVersion = JSON.parse(fs.readFileSync("package.json", "utf-8"))[
+  "version"
+];
+
+export const epilogue = `This tool is under active development. If you experience issues or have questions, please contact Travis Prescott directly (trpresco@microsoft.com). [Tool version: ${packageVersion}]`;
+
 const typespecOutputDir = `${process.cwd()}/tsp-output`;
 
 const args = await yargs(hideBin(process.argv))
   .usage("Usage: $0 --lhs [path...] --rhs [path...]")
   .demandOption(["lhs", "rhs"])
+  .epilogue(epilogue)
   .options("lhs", {
     type: "array",
     demandOption: true,
@@ -84,7 +92,21 @@ const args = await yargs(hideBin(process.argv))
     coerce: (arg) => arg === "true",
     default: process.env.VERBOSE,
   })
+  .wrap(120)
   .parse();
+
+// Global error handling
+process.on("unhandledRejection", (reason, promise) => {
+  console.error(`Unhandled Rejection at: ${promise} reason: ${reason}\n\n`);
+  console.error(epilogue);
+  process.exit(1);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error(`Uncaught Exception: ${error}\n\n`);
+  console.error(epilogue);
+  process.exit(1);
+});
 
 await main();
 
@@ -246,7 +268,7 @@ async function main() {
   // sort the diffs into three buckets: flagged violations, assumed violations, and no violations
   const results = processDiff(diff(lhs, rhs), lhs, rhs);
   if (!results) {
-    throw new Error("Error occurred while processing diffs.");
+    throw new Error(`Error occurred while processing diffs.\n\n${epilogue}`);
   }
   const flaggedViolations = results.flaggedViolations ?? [];
   const assumedViolations = results.assumedViolations ?? [];
@@ -373,6 +395,8 @@ async function main() {
       console.warn("or run with `--verbose` to see more detailed information.");
     }
   }
+  console.warn(epilogue);
+  return 1;
 }
 
 async function writeGroupedViolations(
