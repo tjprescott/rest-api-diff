@@ -1,6 +1,6 @@
 {
   "name": "@azure-tools/rest-api-diff",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Compares two Swagger definitions to identify relevant differences.",
   "type": "module",
   "scripts": {
@@ -8,14 +8,14 @@
     "watch": "tsc -p . --watch",
     "clean": "rimraf ./dist ./temp",
     "test": "vitest run",
-    "diff": "node dist/src/index.js"
+    "diff": "node dist/index.js"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "author": "Microsoft Corporation",
   "license": "MIT",
-  "main": "dist/src/index.js",
+  "main": "dist/index.js",
   "publishConfig": {
     "access": "public"
   },
@@ -38,7 +38,7 @@
     "tsx": "^4.15.7",
     "typescript": "^5.5.2"
   },
-  "types": "./dist/src/index.d.ts",
+  "types": "./dist/index.d.ts",
   "dependencies": {
     "@azure-tools/typespec-azure-core": ">=0.44.0, <1.0.0",
     "@azure-tools/typespec-autorest": ">=0.44.0, <1.0.0",
