@@ -16,6 +16,13 @@
   "author": "Microsoft Corporation",
   "license": "MIT",
   "main": "dist/index.js",
+  "bin": {
+    "rest-api-diff": "cmd/rest-api-diff.js"
+  },
+  "files": [
+    "dist",
+    "cmd/rest-api-diff.js"
+  ],
   "publishConfig": {
     "access": "public"
   },
