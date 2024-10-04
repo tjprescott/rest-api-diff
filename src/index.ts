@@ -178,6 +178,9 @@ async function compileTypespec(
     const version = args["typespec-version-selector"];
     options.push(`--option=@azure-tools/typespec-autorest.version=${version}`);
   }
+  if (args["verbose"]) {
+    options.push("--trace=@azure-tools/typespec-autorest");
+  }
   const command = `${tspCommand} compile ${path} --emit=@azure-tools/typespec-autorest ${options.join(" ")}`;
   const result = await new Promise((resolve, reject) => {
     console.log(`Running: ${command}`);

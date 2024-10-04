@@ -1,8 +1,9 @@
 # @azure-tools/rest-api-diff
 
-## 0.1.2 (TBD)
+## 0.1.3 (2024-10-04)
 
 - Fix display of tool version in help.
+- Allow invocation using `npx rest-api-diff`.
 
 ## 0.1.1 (2024-08-15)
 
