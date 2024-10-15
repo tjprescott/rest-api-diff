@@ -1,5 +1,9 @@
 # @azure-tools/rest-api-diff
 
+## 0.1.4 (2024-10-15)
+
+- Prevent crash if unable to find package version.
+
 ## 0.1.3 (2024-10-04)
 
 - Fix display of tool version in help.

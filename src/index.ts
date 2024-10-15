@@ -8,10 +8,7 @@ const { diff } = pkg;
 import { OpenAPIV2 } from "openapi-types";
 import { exec } from "child_process";
 import * as dotenv from "dotenv";
-import { readFile } from "fs/promises";
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { joinPaths } from "@typespec/compiler";
+import { VERSION } from "./version.js";
 
 dotenv.config();
 
@@ -23,12 +20,7 @@ interface ResultSummary {
   unreferencedObjects: number;
 }
 
-// extract package version from package.json
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const packageJsonPath = joinPaths(__dirname, "..", "package.json");
-const packageJson = JSON.parse(await readFile(packageJsonPath, "utf-8"));
-
-export const epilogue = `This tool is under active development. If you experience issues or have questions, please contact Travis Prescott directly (trpresco@microsoft.com). [Tool version: ${packageJson.version}]`;
+export const epilogue = `This tool is under active development. If you experience issues or have questions, please contact Travis Prescott directly (trpresco@microsoft.com). [Tool version: ${VERSION}]`;
 
 const typespecOutputDir = `${process.cwd()}/tsp-output`;
 
