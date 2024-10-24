@@ -20,6 +20,12 @@ const args = await yargs(hideBin(process.argv))
     coerce: (arg) => arg.map(String),
     default: process.env.LHS ? process.env.LHS.split(" ") : undefined,
   })
+  .options("lhs-root", {
+    type: "string",
+    describe:
+      "The root path to use in order to resolve references in compiled LHS TypeSpec.",
+    default: process.env.LHS_ROOT,
+  })
   .options("rhs", {
     type: "array",
     demandOption: true,
@@ -27,6 +33,12 @@ const args = await yargs(hideBin(process.argv))
       "The files to compare against. Can be an array of files or directories. Directories will be crawled for JSON files. Non-Swagger files will be ignored.",
     coerce: (arg) => arg.map(String),
     default: process.env.RHS ? process.env.RHS.split(" ") : undefined,
+  })
+  .options("rhs-root", {
+    type: "string",
+    describe:
+      "The root path to use in order to resolve references in compiled RHS TypeSpec.",
+    default: process.env.RHS_ROOT,
   })
   .options("compile-tsp", {
     type: "boolean",

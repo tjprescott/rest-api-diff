@@ -13,7 +13,6 @@ import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";
 import path from "path";
 import { SuppressionRegistry } from "./suppression.js";
-import { HtmlDiffClient } from "./html-diff.js";
 
 export interface DiffClientConfig {
   lhs: string | string[];
@@ -48,13 +47,19 @@ export class DiffClient {
     const client = new DiffClient(config);
     const lhs = client.args["lhs"].map((x: string) => path.resolve(x));
     const rhs = client.args["rhs"].map((x: string) => path.resolve(x));
+    const lhsRoot = client.args["lhs-root"]
+      ? path.resolve(client.args["lhs-root"])
+      : undefined;
+    const rhsRoot = client.args["rhs-root"]
+      ? path.resolve(client.args["rhs-root"])
+      : undefined;
     if (client.args["suppressions"]) {
       client.suppressions = new SuppressionRegistry(
         client.args["suppressions"]
       );
     }
-    const lhsParser = await SwaggerParser.create(lhs, client);
-    const rhsParser = await SwaggerParser.create(rhs, client);
+    const lhsParser = await SwaggerParser.create(lhs, lhsRoot, client);
+    const rhsParser = await SwaggerParser.create(rhs, rhsRoot, client);
     client.lhsParser = lhsParser;
     client.rhsParser = rhsParser;
     return client;

@@ -176,7 +176,7 @@ export class DefinitionRegistry {
       const expVal = this.#expand(val);
       expanded.push(expVal);
     }
-    return expanded;
+    return expanded.toSorted();
   }
 
   #expandDerivedClasses(base: any): any {
@@ -220,7 +220,10 @@ export class DefinitionRegistry {
         const itemVal = item[key];
         switch (key) {
           case "required":
-            base[key] = (baseVal ?? []).concat(itemVal ?? []);
+            const mergedRequired = new Set(
+              (baseVal ?? []).concat(itemVal ?? [])
+            );
+            base[key] = [...mergedRequired];
             break;
           case "properties":
             base[key] = { ...(baseVal ?? {}), ...(itemVal ?? {}) };
