@@ -1,4 +1,2 @@
-- path: "definitions/OperationListResult/type"
-  reason: "Common type"
-- path: "definitions/Operation/properties/display/type"
-  reason: "Common type"
+- path: "paths/blah/example"
+  reason: "Test"
