@@ -1,6 +1,5 @@
 import { OpenAPIV2 } from "openapi-types";
 import { isReference, parseReference } from "./util.js";
-import assert from "assert";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {

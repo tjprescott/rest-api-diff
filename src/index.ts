@@ -255,13 +255,24 @@ function validatePath(path: string): boolean {
   }
 }
 
+function logIfVerbose(message: string) {
+  if (args.verbose) {
+    console.log(message);
+  }
+}
+
 async function main() {
   const in1 = args.lhs;
   const in2 = args.rhs;
 
+  logIfVerbose(`Loading LHS files: ${in1}`);
   let lhsParser = new SwaggerParser(await loadPaths(in1));
-  let rhsParser = new SwaggerParser(await loadPaths(in2));
+  logIfVerbose(`Parsing LHS...`);
   const lhs = lhsParser.parse().asJSON();
+
+  logIfVerbose(`Loading RHS files: ${in2}`);
+  let rhsParser = new SwaggerParser(await loadPaths(in2));
+  logIfVerbose(`Parsing RHS...`);
   const rhs = rhsParser.parse().asJSON();
 
   // sort the diffs into three buckets: flagged violations, assumed violations, and no violations
@@ -271,7 +282,7 @@ async function main() {
   }
   const flaggedViolations = results.flaggedViolations ?? [];
   const assumedViolations = results.assumedViolations ?? [];
-  const allViolations = [...flaggedViolations, ...assumedViolations];
+  const allViolations = [...assumedViolations, ...flaggedViolations];
 
   // ensure the output folder exists and is empty
   const outputFolder = args["output-folder"];

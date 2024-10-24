@@ -15,20 +15,23 @@ const swaggerPropertiesToIgnore = [
   // Swagger properties that contribute documentation and metadata
   // but don't affect the shape of the service.
   "description",
-  "examples",
   "operationId",
   "summary",
-  "tags",
   // Extensions that are intended for consumption by Autorest and thus
   // don't impact the REST API shape.
   "x-ms-client-default",
   "x-ms-client-flatten",
   "x-ms-client-name",
-  "x-ms-code-generation-settings",
   "x-ms-enum",
-  "x-ms-examples",
   "x-ms-parameter-grouping",
   "x-ms-parameter-location",
+];
+
+const swaggerArrayPropertieToIgnore = [
+  "x-ms-examples",
+  "tags",
+  "examples",
+  "x-ms-code-generation-settings",
 ];
 
 export function ignoreSwaggerPropertiesRule(data: Diff<any, any>): RuleResult {
@@ -40,6 +43,12 @@ export function ignoreSwaggerPropertiesRule(data: Diff<any, any>): RuleResult {
   }
   for (const pathToIgnore of specificPathsToIgnore) {
     if (fullPath.startsWith(pathToIgnore)) {
+      return RuleResult.NoViolation;
+    }
+  }
+  const lastTwoPaths = data.path.slice(-2);
+  for (const prop of swaggerArrayPropertieToIgnore) {
+    if (lastTwoPaths.includes(prop)) {
       return RuleResult.NoViolation;
     }
   }

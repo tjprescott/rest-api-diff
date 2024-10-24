@@ -15,7 +15,7 @@ export function compareRequestRequiredRule(
     return RuleResult.NoViolation;
   }
   if (data.kind === "N") {
-    const message = `Reqest parameter '${path}' is not required in the LHS but is in the RHS.`;
+    const message = `Request parameter '${path}' is not required in the LHS but is in the RHS.`;
     return [RuleResult.FlaggedViolation, message];
   }
   return RuleResult.ContinueProcessing;
