@@ -14,7 +14,7 @@ export function ignoreSwaggerDefinitionsRule(
   if (!data.path) return;
   const fullPath = data.path.join(".");
   for (const pathToIgnore of specificPathsToIgnore) {
-    if (fullPath.startsWith(pathToIgnore)) {
+    if (data.path[0] === pathToIgnore) {
       return RuleResult.NoViolation;
     }
   }

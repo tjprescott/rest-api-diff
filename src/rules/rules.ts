@@ -13,6 +13,34 @@ import { compareResponseRequiredRule } from "./compare-response-required.js";
 import { compareRequestRequiredRule } from "./compare-request-required.js";
 import { ignoreSwaggerDefinitionsRule } from "./ignore-swagger-definitions.js";
 import { compareXMsIdentifiersRule } from "./compare-x-ms-identifiers.js";
+import { xFormatChangedRule } from "./x-format-changed.js";
+import { xNameChangedRule } from "./x-name-changed.js";
+import { xEnumAddedRule } from "./x-enum-added.js";
+import { xMsMutabilityAddedRule } from "./x-ms-mutability-added.js";
+import { xResponseAddedRule } from "./x-response-added.js";
+import { xMsLongRunningOperationChangedRule } from "./x-ms-long-running-operation-changed.js";
+import { xConstraintChangedRule } from "./x-constraint-changed.js";
+import { xPathAddedRule } from "./x-path-added.js";
+import { xPathRemovedRule } from "./x-path-removed.js";
+import { xMsAzureResourceChangedRule } from "./x-ms-azure-resource-changed.js";
+import { xResponseRemovedRule } from "./x-response-removed.js";
+import { xParameterInChangedRule } from "./x-parameter-in-changed.js";
+import { xMsLongRunningOperationOptionsChangedRule } from "./x-ms-long-running-operations-options-changed.js";
+import { xMsSecretChangedRule } from "./x-ms-secret-changed.js";
+import { xParameterSchemaChangedRule } from "./x-parameter-schema-changed.js";
+import { xProducesChangedRule } from "./x-produces-changed.js";
+import { xConsumesChangedRule } from "./x-consumes-changed.js";
+import { xParameterChangedRule } from "./x-parameter-changed.js";
+import { xRequiredChangedRule } from "./x-required-changed.js";
+import { xAdditionalPropertiesChangedRule } from "./x-additional-properties-changed.js";
+import { xIgnoreObjectAddedRule } from "./x-ignore-object-added.js";
+import { xAnyOfChangedRule } from "./x-any-of-changed.js";
+import { xReadOnlyChangedRule } from "./x-read-only-changed.js";
+import { xHeadersAddedRule } from "./x-headers-added.js";
+import { xSystemDataAddedRule } from "./x-system-data-added.js";
+import { xPropertyRemovedRule } from "./x-property-removed.js";
+import { xDefaultFalseRemovedRule } from "./x-default-false-removed.js";
+import { xDiskControllerTypeItemsRemovedRule } from "./x-disk-controller-type-items-removed.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -47,9 +75,40 @@ export function getApplicableRules(args: any): RuleSignature[] {
     compareRequestRequiredRule,
   ];
 
+  let tempRules = [
+    xConstraintChangedRule,
+    xFormatChangedRule,
+    xMsMutabilityAddedRule,
+    xEnumAddedRule,
+    xNameChangedRule,
+    xResponseAddedRule,
+    xResponseRemovedRule,
+    xMsLongRunningOperationOptionsChangedRule,
+    xMsLongRunningOperationChangedRule,
+    xPathAddedRule,
+    xPathRemovedRule,
+    xMsAzureResourceChangedRule,
+    xParameterInChangedRule,
+    xMsSecretChangedRule,
+    xParameterSchemaChangedRule,
+    xProducesChangedRule,
+    xConsumesChangedRule,
+    xParameterChangedRule,
+    xRequiredChangedRule,
+    xAdditionalPropertiesChangedRule,
+    xSystemDataAddedRule,
+    xIgnoreObjectAddedRule,
+    xAnyOfChangedRule,
+    xReadOnlyChangedRule,
+    xHeadersAddedRule,
+    xPropertyRemovedRule,
+    xDefaultFalseRemovedRule,
+    xDiskControllerTypeItemsRemovedRule,
+  ];
+
   const preserveDefinitions = args["preserve-definitions"];
   if (!preserveDefinitions) {
     rules.push(ignoreSwaggerDefinitionsRule);
   }
-  return rules;
+  return [...rules, ...tempRules];
 }
