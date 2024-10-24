@@ -2,7 +2,7 @@ import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";
 import { exec } from "child_process";
 import path from "path";
-import { off } from "process";
+import { OpenAPIV2 } from "openapi-types";
 
 const typespecOutputDir = `${process.cwd()}/tsp-output`;
 
@@ -353,4 +353,16 @@ export function toSorted<T>(
   compareFn?: (a: T, b: T) => number
 ): T[] {
   return [...array].sort(compareFn);
+}
+
+/** Search a document for an item at a specific path
+ * @param path The path to the item
+ * @param doc The document to search
+ */
+export function getItemAtPath(path: string[], doc: OpenAPIV2.Document): any {
+  let item = doc;
+  for (const segment of path) {
+    item = (item as any)[segment];
+  }
+  return item as any;
 }

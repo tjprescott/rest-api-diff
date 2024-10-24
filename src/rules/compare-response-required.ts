@@ -15,7 +15,6 @@ export function compareResponseRequiredRule(
     return RuleResult.NoViolation;
   }
   if (data.kind === "D") {
-    const message = `Response property '${path}' is required in the LHS but not the RHS.`;
-    return [RuleResult.FlaggedViolation, message];
+    return RuleResult.FlaggedViolation;
   }
 }
