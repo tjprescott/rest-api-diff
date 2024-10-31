@@ -1,6 +1,5 @@
 import { OpenAPIV2 } from "openapi-types";
-import { isReference, parseReference } from "./util.js";
-import assert from "assert";
+import { isReference, loadPaths, parseReference } from "./util.js";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {
@@ -59,6 +58,7 @@ export class DefinitionRegistry {
   private polymorphicMap = new Map<string, Set<string>>();
   private swaggerMap: Map<string, OpenAPIV2.Document>;
   private unresolvedReferences = new Set<string>();
+  private externalReferences = new Set<string>();
   private referenceStack: string[] = [];
   private referenceMap = new Map<string, Set<string>>();
 
@@ -87,6 +87,7 @@ export class DefinitionRegistry {
       ),
     };
     this.#gatherDefinitions(this.swaggerMap);
+    this.#loadExternalReferences();
     this.#expandReferences();
   }
 
@@ -99,6 +100,9 @@ export class DefinitionRegistry {
       const refResult = parseReference(ref);
       if (!refResult) {
         return item;
+      }
+      if (refResult.filePath) {
+        this.externalReferences.add(refResult.filePath);
       }
       const kind = refResult.registry;
       let match = this.get(refResult.name, kind);
@@ -224,9 +228,6 @@ export class DefinitionRegistry {
 
   #expandReferenceMap() {
     for (const [key, values] of this.referenceMap.entries()) {
-      if (key === "AnalyzeTextTaskResult") {
-        let test = "best";
-      }
       const expanded = new Set<string>();
       this.#expandSetWithItems(expanded, values);
       const derivedClasses = this.polymorphicMap.get(key);
@@ -252,7 +253,8 @@ export class DefinitionRegistry {
       for (const derived of derivedClasses) {
         const derivedClass = this.get(derived, collection.kind);
         if (derivedClass === undefined) {
-          throw new Error(`Derived class ${derived} not found.`);
+          this.logUnresolvedReference(derived);
+          continue;
         }
         value["$anyOf"].push(derivedClass);
       }
@@ -275,11 +277,13 @@ export class DefinitionRegistry {
     if (Array.isArray(allOf) && allOf.length === 1 && isReference(allOf[0])) {
       // allOf is targeting a base class
       const ref = allOf[0].$ref;
-      const refParts = ref.split("/");
-      const refName = refParts[refParts.length - 1];
-      const set = this.polymorphicMap.get(refName);
+      const refMeta = parseReference(ref);
+      if (refMeta?.filePath) {
+        this.externalReferences.add(refMeta.filePath);
+      }
+      const set = this.polymorphicMap.get(ref);
       if (set === undefined) {
-        this.polymorphicMap.set(refName, new Set([key]));
+        this.polymorphicMap.set(ref, new Set([key]));
       } else {
         set.add(key);
       }
@@ -341,18 +345,24 @@ export class DefinitionRegistry {
     }
     // ensure each base class has a list of derived classes for use
     // when interpretting allOf.
-    for (const [name, set] of this.polymorphicMap.entries()) {
-      const baseClass = this.get(name);
+    for (const [ref, set] of this.polymorphicMap.entries()) {
+      const baseClass = this.get(ref);
       if (baseClass === undefined) {
-        throw new Error(`Base class ${name} not found.`);
+        this.logUnresolvedReference(ref);
+        continue;
       }
       // ensure all base classes have the discriminator property
       const discriminator = baseClass.discriminator;
       if (discriminator === undefined) {
-        console.warn(`Base class ${name} has no discriminator.`);
+        console.warn(`Base class ${ref} has no discriminator.`);
       }
       baseClass["$derivedClasses"] = Array.from(set);
     }
+  }
+
+  async #loadExternalReferences() {
+    const result = await loadPaths([...this.externalReferences]);
+    let test = "best";
   }
 
   /** Get a collection. */
