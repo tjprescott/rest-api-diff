@@ -8,6 +8,7 @@ import { OpenAPIV2 } from "openapi-types";
 import * as dotenv from "dotenv";
 import { VERSION } from "./version.js";
 import * as fs from "fs";
+import { loadPaths } from "./util.js";
 
 dotenv.config();
 
@@ -20,8 +21,6 @@ interface ResultSummary {
 }
 
 export const epilogue = `This tool is under active development. If you experience issues or have questions, please contact Travis Prescott directly (trpresco@microsoft.com). [Tool version: ${VERSION}]`;
-
-const typespecOutputDir = `${process.cwd()}/tsp-output`;
 
 const args = await yargs(hideBin(process.argv))
   .usage("Usage: $0 --lhs [path...] --rhs [path...]")
@@ -42,6 +41,18 @@ const args = await yargs(hideBin(process.argv))
       "The files to compare against. Can be an array of files or directories. Directories will be crawled for JSON files. Non-Swagger files will be ignored.",
     coerce: (arg) => arg.map(String),
     default: process.env.RHS ? process.env.RHS.split(" ") : undefined,
+  })
+  .options("lhs-root", {
+    type: "string",
+    describe:
+      "The root path to use when resolving relative LHS file references. If only one value is specified, assumes that. Otherwise, assumes cwd.",
+    default: process.env.LHS_ROOT,
+  })
+  .options("rhs-root", {
+    type: "string",
+    describe:
+      "The root path to use when resolving relative RHS file references. If only one value is specified, assumes that. Otherwise, assumes cwd.",
+    default: process.env.RHS_ROOT,
   })
   .options("compile-tsp", {
     type: "boolean",
@@ -105,12 +116,24 @@ process.on("uncaughtException", (error) => {
 
 await main();
 
+function getDefaultRootPath(paths: string[]): string {
+  if (paths.length === 1) {
+    return paths[0];
+  } else {
+    return process.cwd();
+  }
+}
+
 async function main() {
   const in1 = args.lhs;
+  const lhsRoot = args["lhs-root"] ?? getDefaultRootPath(in1);
   const in2 = args.rhs;
+  const rhsRoot = args["rhs-root"] ?? getDefaultRootPath(in2);
 
-  let lhsParser = new SwaggerParser(await loadPaths(in1));
-  let rhsParser = new SwaggerParser(await loadPaths(in2));
+  let lhsParser = new SwaggerParser(await loadPaths(in1, args), lhsRoot, args);
+  await lhsParser.updateDiscoveredReferences();
+  let rhsParser = new SwaggerParser(await loadPaths(in2, args), rhsRoot, args);
+  await rhsParser.updateDiscoveredReferences();
   const lhs = lhsParser.parse().asJSON();
   const rhs = rhsParser.parse().asJSON();
 

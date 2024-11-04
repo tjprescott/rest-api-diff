@@ -12,12 +12,18 @@ export class SwaggerParser {
   private defaultProduces?: string[];
   private errorSchemas: Map<string, OpenAPIV2.SchemaObject> = new Map();
   private host?: string;
+  private rootPath: string;
   private swaggerMap: Map<string, any>;
   private result: any = {};
 
-  constructor(map: Map<string, any>) {
-    this.defRegistry = new DefinitionRegistry(map);
+  constructor(map: Map<string, any>, rootPath: string, args: any) {
+    this.rootPath = rootPath;
+    this.defRegistry = new DefinitionRegistry(map, rootPath, args);
     this.swaggerMap = map;
+  }
+
+  async updateDiscoveredReferences() {
+    await this.defRegistry.updateDiscoveredReferences();
   }
 
   /** Get the parsed result as a JSON object. */
@@ -47,7 +53,7 @@ export class SwaggerParser {
 
   /** Special handling for the root of a Swagger object. */
   parse(): SwaggerParser {
-    for (const [filename, data] of this.swaggerMap.entries()) {
+    for (const [LHS_ROOT, data] of this.swaggerMap.entries()) {
       // Retrieve any top-level defaults that need to be normalized later on.
       this.parameterizedHost = data["x-ms-parameterized-host"];
       this.defaultConsumes = data["consumes"];
@@ -293,33 +299,37 @@ export class SwaggerParser {
     if (isReference(value)) {
       // get the value of the $ref key
       const ref = (value as any)["$ref"];
-      const refResult = parseReference(ref);
+      const refResult = parseReference(ref, this.rootPath);
       if (!refResult) {
         if (ref.includes("examples")) {
           // special case examples since they simply don't matter
           return {
             $example: ref,
           };
-        } else {
-          // preseve the $ref and log an unresolved reference
-          this.defRegistry.logUnresolvedReference(value);
-          return {
-            $ref: ref,
-          };
         }
+        throw new Error(`Failed to parse reference: ${ref}`);
       }
-      const resolved = this.defRegistry.get(refResult.name, refResult.registry);
+      const resolved = this.defRegistry.get(refResult);
       if (!resolved) {
         // log an unresolved reference
+        console.warn(`Unresolved reference: ${ref}`);
         this.defRegistry.logUnresolvedReference(value);
         return {
           $ref: ref,
         };
       }
-      this.defRegistry.countReference(refResult.name, refResult.registry);
+      this.defRegistry.countReference(
+        refResult.fullPath,
+        refResult.name,
+        refResult.registry
+      );
       const references = this.defRegistry.getReferences(refResult.name);
       for (const ref of references) {
-        this.defRegistry.countReference(ref, refResult.registry);
+        this.defRegistry.countReference(
+          refResult.fullPath!,
+          ref,
+          refResult.registry
+        );
       }
       return this.#parseObject(resolved);
     }
