@@ -33,6 +33,9 @@ export function parseReference(
   if (!rootPath && !filePath) {
     throw new Error("At least one of rootPath or filePath must be provided.");
   }
+  // replace backslashes with forward slashes since that is what
+  // the regex expects.
+  ref = ref.replace(/\\/g, "/");
   const regex = /(.+\.json)?#\/(.+)\/(.+)/;
   const match = ref.match(regex);
   if (!match) {
@@ -155,11 +158,23 @@ export async function loadPaths(
   return jsonContents;
 }
 
+/** Expands all local references into fully-qualified ones. */
+function normalizeReferences(path: string, content: string): string {
+  // ensure backslashes are replaced with forward slashes
+  path = path.replace(/\\/g, "/");
+  const regex = /"\$ref": ("#\/\w+\/\w+")/gm;
+  const updated = content.replace(regex, (_, p1) => {
+    const newRef = `"${path}${p1.slice(1)}`;
+    return `"$ref": ${newRef}`;
+  });
+  return updated;
+}
+
 /**
  * Loads Swagger files. If the file is not a Swagger file, it will return undefined.
  */
 async function loadSwaggerFile(path: string): Promise<any | undefined> {
-  const fileContent = fs.readFileSync(path, "utf-8");
+  const fileContent = normalizeReferences(path, fs.readFileSync(path, "utf-8"));
   try {
     const jsonContent = JSON.parse(fileContent);
     if (!jsonContent.swagger) {

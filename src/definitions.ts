@@ -70,14 +70,15 @@ export class DefinitionRegistry {
     responses: CollectionRegistry;
     securityDefinitions: CollectionRegistry;
   };
+  /** The key is the parent class and the values are the set of child classes that derive from the parent. */
   private polymorphicMap = new Map<string, Set<string>>();
-  private swaggerMap: Map<string, OpenAPIV2.Document>;
   private unresolvedReferences = new Set<string>();
   private providedPaths = new Set<string>();
   private externalReferences = new Set<string>();
   private referenceStack: string[] = [];
   private referenceMap = new Map<string, Set<string>>();
   private rootPath: string;
+  private currentPath: string | undefined;
   private args: any;
 
   constructor(
@@ -85,7 +86,6 @@ export class DefinitionRegistry {
     rootPath: string,
     args: any
   ) {
-    this.swaggerMap = map;
     this.data = {
       definitions: new CollectionRegistry(
         map,
@@ -112,7 +112,8 @@ export class DefinitionRegistry {
       this.providedPaths.add(path.normalize(key));
     }
     this.rootPath = rootPath;
-    this.#gatherDefinitions(this.swaggerMap);
+    this.currentPath;
+    this.#gatherDefinitions(map);
     this.args = args;
   }
 
@@ -133,7 +134,6 @@ export class DefinitionRegistry {
       !this.providedPaths.has(fullPathNorm) &&
       !this.externalReferences.has(fullPathNorm)
     ) {
-      console.log(`Found external reference: ${fullPathNorm}`);
       this.externalReferences.add(fullPathNorm);
     }
   }
@@ -143,12 +143,11 @@ export class DefinitionRegistry {
       const itemCopy = JSON.parse(JSON.stringify(item));
       const ref = item["$ref"];
       delete itemCopy["$ref"];
-      const refResult = parseReference(ref, this.rootPath);
+      const refResult = parseReference(ref, this.rootPath, this.currentPath);
       if (!refResult) {
         return item;
       }
       this.#addIfExternal(refResult.fullPath);
-      const kind = refResult.registry;
       let match = this.get(refResult);
       if (match) {
         if (this.referenceStack.includes(refResult.name)) {
@@ -164,6 +163,9 @@ export class DefinitionRegistry {
           return this.#expand(matchCopy, refResult.name);
         }
       } else {
+        // ensure that the expandedRef is stored because the parser doesn't
+        // have the information to resolve relative paths.
+        item.$ref = refResult.expandedRef;
         return item;
       }
     } else {
@@ -232,7 +234,7 @@ export class DefinitionRegistry {
     }
   }
 
-  #expand(item: any, referenceName?: string): any {
+  #expand(item: any, referenceName?: string, filePath?: string): any {
     if (referenceName !== undefined) {
       if (this.referenceStack.includes(referenceName)) {
         return item;
@@ -283,6 +285,7 @@ export class DefinitionRegistry {
   #expandReferencesForCollection(collection: CollectionRegistry) {
     this.referenceStack = [];
     for (const [path, values] of collection.data.entries()) {
+      this.currentPath = path;
       for (const [key, value] of values.entries()) {
         let expanded = this.#expand(value, key);
         collection.data.get(path)!.set(key, expanded);
@@ -338,7 +341,7 @@ export class DefinitionRegistry {
    * @param key The name of the object being processed
    * @param filePath The current filePath of the object being processed
    */
-  #processAllOf(allOf: any, filePath: string) {
+  #processAllOf(allOf: any, key: string, filePath: string) {
     if (Array.isArray(allOf) && allOf.length === 1 && isReference(allOf[0])) {
       // allOf is targeting a base class
       const ref = allOf[0].$ref;
@@ -349,14 +352,11 @@ export class DefinitionRegistry {
       // record external references so those files can be discovered and loaded later
       this.#addIfExternal(refResult.fullPath);
       allOf[0].$ref = refResult.expandedRef;
-      const set = this.polymorphicMap.get(refResult.fullPath);
+      const set = this.polymorphicMap.get(refResult.expandedRef);
       if (set === undefined) {
-        this.polymorphicMap.set(
-          refResult.fullPath,
-          new Set([refResult.expandedRef])
-        );
+        this.polymorphicMap.set(refResult.expandedRef, new Set([key]));
       } else {
-        set.add(refResult.expandedRef);
+        set.add(key);
       }
     } else if (allOf) {
       // allOf is listing properties to mix-in
@@ -366,7 +366,7 @@ export class DefinitionRegistry {
 
   #visitDefinition(filePath: string, key: string, data: any) {
     const allOf = data.allOf;
-    this.#processAllOf(allOf, filePath);
+    this.#processAllOf(allOf, key, filePath);
     this.data.definitions.add(filePath, key, data);
   }
 
@@ -375,8 +375,7 @@ export class DefinitionRegistry {
       return;
     }
     const allOf = data.allOf;
-    this.#processAllOf(allOf, path);
-    let test = "best";
+    this.#processAllOf(allOf, data.name, path);
   }
 
   #visitParameter(path: string, key: string, data: any) {
@@ -418,20 +417,16 @@ export class DefinitionRegistry {
     // ensure each base class has a list of derived classes for use
     // when interpretting allOf.
     for (const [ref, set] of this.polymorphicMap.entries()) {
-      console.log(`Polymorphic entry: ${ref}`);
-      const refResult = parseReference(ref, this.rootPath)!;
+      const refResult = parseReference(ref, this.rootPath);
+      if (!refResult) {
+        throw new Error(`Could not parse reference: ${ref}`);
+      }
       const baseClass = this.get(refResult);
       if (baseClass === undefined) {
         this.logUnresolvedReference(ref);
         continue;
       }
-      // ensure all base classes have the discriminator property
-      const discriminator = baseClass.discriminator;
-      if (discriminator === undefined) {
-        console.warn(`Base class ${ref} has no discriminator.`);
-      }
       baseClass["$derivedClasses"] = Array.from(set);
-      console.log(`  DONE: ${ref}`);
     }
   }
 
