@@ -312,7 +312,6 @@ export class SwaggerParser {
       const resolved = this.defRegistry.get(refResult);
       if (!resolved) {
         // log an unresolved reference
-        console.warn(`Unresolved reference: ${ref}`);
         this.defRegistry.logUnresolvedReference(value);
         return {
           $ref: ref,

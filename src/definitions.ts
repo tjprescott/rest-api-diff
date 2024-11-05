@@ -23,13 +23,29 @@ export class CollectionRegistry {
 
   constructor(data: Map<string, any>, key: string, kind: RegistryKind) {
     this.kind = kind;
-    for (const [_, value] of data.entries()) {
+    for (const [path, value] of data.entries()) {
       const subdata = (value as any)[key];
       if (subdata !== undefined) {
         for (const [name, _] of Object.entries(subdata).toSorted()) {
-          this.unreferenced.add(name);
+          // replace backslashes with forward slashes
+          const normPath = path.replace(/\\/g, "/");
+          const pathKey = `${normPath}#/${this.getRegistryName()}/${name}`;
+          this.unreferenced.add(pathKey);
         }
       }
+    }
+  }
+
+  getRegistryName(): string {
+    switch (this.kind) {
+      case RegistryKind.Definition:
+        return "definitions";
+      case RegistryKind.Parameter:
+        return "parameters";
+      case RegistryKind.Response:
+        return "responses";
+      case RegistryKind.SecurityDefinition:
+        return "securityDefinitions";
     }
   }
 
@@ -51,9 +67,11 @@ export class CollectionRegistry {
   }
 
   /** Mark an item as referenced. */
-  countReference(path: string, name: string) {
-    const key = `${path}/${name}`;
-    this.unreferenced.delete(key);
+  countReference(path: string, name: string, kind: RegistryKind) {
+    // convert backslashes to forward slashes
+    path = path.replace(/\\/g, "/");
+    const pathKey = `${path}#/${this.getRegistryName()}/${name}`;
+    this.unreferenced.delete(pathKey);
   }
 
   /** Resolve list of unreferenced objects. */
@@ -119,6 +137,8 @@ export class DefinitionRegistry {
 
   async updateDiscoveredReferences() {
     await this.#loadExternalReferences();
+    // reset the unresolved references now that the external references have been loaded
+    this.unresolvedReferences = new Set<string>();
     this.#expandReferences();
   }
 
@@ -293,7 +313,7 @@ export class DefinitionRegistry {
     }
     // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
     for (const [path, values] of collection.data.entries()) {
-      for (const [key, value] of values) {
+      for (const [_, value] of values) {
         const derivedClasses = value["$derivedClasses"];
         delete value["$derivedClasses"];
         if (!derivedClasses) {
@@ -301,14 +321,11 @@ export class DefinitionRegistry {
         }
         value["$anyOf"] = [];
         for (const derived of derivedClasses) {
-          const refMeta = {
-            original: "",
-            expandedRef: "",
-            name: derived,
-            fullPath: path,
-            registry: collection.kind,
-          };
-          const derivedClass = this.get(refMeta);
+          const refResult = parseReference(derived, this.rootPath, path);
+          if (!refResult) {
+            throw new Error(`Could not parse reference: ${derived}`);
+          }
+          const derivedClass = this.get(refResult);
           if (derivedClass === undefined) {
             this.logUnresolvedReference(derived);
             continue;
@@ -353,10 +370,12 @@ export class DefinitionRegistry {
       this.#addIfExternal(refResult.fullPath);
       allOf[0].$ref = refResult.expandedRef;
       const set = this.polymorphicMap.get(refResult.expandedRef);
+      let pathKey = `${filePath}#/${this.getRegistryName(refResult.registry)}/${key}`;
+      pathKey = pathKey.replace(/\\/g, "/");
       if (set === undefined) {
-        this.polymorphicMap.set(refResult.expandedRef, new Set([key]));
+        this.polymorphicMap.set(refResult.expandedRef, new Set([pathKey]));
       } else {
-        set.add(key);
+        set.add(pathKey);
       }
     } else if (allOf) {
       // allOf is listing properties to mix-in
@@ -511,16 +530,16 @@ export class DefinitionRegistry {
   countReference(path: string, name: string, registry: RegistryKind) {
     switch (registry) {
       case RegistryKind.Definition:
-        this.data.definitions.countReference(path, name);
+        this.data.definitions.countReference(path, name, registry);
         break;
       case RegistryKind.Parameter:
-        this.data.parameters.countReference(path, name);
+        this.data.parameters.countReference(path, name, registry);
         break;
       case RegistryKind.Response:
-        this.data.responses.countReference(path, name);
+        this.data.responses.countReference(path, name, registry);
         break;
       case RegistryKind.SecurityDefinition:
-        this.data.securityDefinitions.countReference(path, name);
+        this.data.securityDefinitions.countReference(path, name, registry);
         break;
     }
   }
