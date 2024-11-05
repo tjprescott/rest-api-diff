@@ -26,6 +26,9 @@ but will not search subfolders.
 
 ### Options
 
+- `--lhs-root`: The root path to use when resolving relative file references for the left-hand side. Defaults
+  to `--lhs` if only one value is specified, otherwise defaults to the current working directory.
+- `--rhs-root`: Same as `--lhs-root` but for the right-hand side.
 - `--compile-tsp`: The tool will attempt to compile TypeSpec files to Swagger using the
   `@azure-tools/autorest` emitter. If existing Swagger files are found, they will be overwritten
   by the compilation.
@@ -46,11 +49,12 @@ but will not search subfolders.
 
 ### .env File
 
-You can also specify environment variables for all options and/or use a .env file. Example
+You can also specify environment variables for all options and/or use a .env file. Example:
 
 ```
-LHS="KeyVaultOriginal/common.json KeyVaultOriginal/secrets.json"
+LHS="KeyVaultOriginal/secrets.json"
 RHS="KeyVaultGenerated"
+RHS="<PATH_TO_SPECS_REPO>/specification"
 COMPILE_TSP="true"
 GROUP_VIOLATIONS="true"
 TYPESPEC_COMPILER_PATH="<PATH_TO_SPECS_REPO>/node_modules/@typespec/compiler"
@@ -97,10 +101,14 @@ debugging purposes.
 
 ## Running against the REST API Specs Repo
 
+These steps assumed that `--lhs` points to a Swagger folder and `--rhs` points to a TypeSpec folder, both within the REST API specs repo. If this is not the case, your steps will differ.
+
 1. Ensure you have updated the dependencies in your fork by running `npm install` in the REST API specs repo root. You may need to delete `package-lock.json` first. Copy the path to the `node_modules/@typespec/compiler` package.
 2. Set the `TYPESPEC_COMPILER_PATH` environment variable (ideally in .env) to the path you copied in step 1.
 3. Ensure that LHS and RHS point to the appropriate paths in the REST API specs repo.
-4. If you are comparing to a multi-versioned TypeSpec, you should probably include the `TYPESPEC_VERSION_SELECTOR` environment variable to ensure you are generating the right version for comparison.
+4. Set the `LHS_ROOT` environment variable (ideally in .env) to the root of your Swagger folder in the REST API specs repo. If you are targeting that folder with `--lhs`, you can omit this, as the tool will automatically use this folder.
+5. Set the `RHS_ROOT` environment variable (ideally in .env) to the `specification` folder in your REST API specs repo. This will ensure that the tool can resolve relative references in the TypeSpec-generated Swagger.
+6. If you are comparing to a multi-versioned TypeSpec, you should probably include the `TYPESPEC_VERSION_SELECTOR` environment variable to ensure you are generating the right version for comparison.
 
 ## Rules
 
