@@ -162,7 +162,7 @@ export async function loadPaths(
 function normalizeReferences(path: string, content: string): string {
   // ensure backslashes are replaced with forward slashes
   path = path.replace(/\\/g, "/");
-  const regex = /"\$ref": ("#\/\w+\/\w+")/gm;
+  const regex = /"\$ref": ("#\/\w+\/[\w\.]+")/gm;
   const updated = content.replace(regex, (_, p1) => {
     const newRef = `"${path}${p1.slice(1)}`;
     return `"$ref": ${newRef}`;
