@@ -53,7 +53,7 @@ export class SwaggerParser {
 
   /** Special handling for the root of a Swagger object. */
   parse(): SwaggerParser {
-    for (const [LHS_ROOT, data] of this.swaggerMap.entries()) {
+    for (const [_, data] of this.swaggerMap.entries()) {
       // Retrieve any top-level defaults that need to be normalized later on.
       this.parameterizedHost = data["x-ms-parameterized-host"];
       this.defaultConsumes = data["consumes"];
@@ -94,22 +94,22 @@ export class SwaggerParser {
             this.result[key] = this.parseNode(val);
             break;
           case "definitions":
-            this.result[key] = this.defRegistry.getCollection(
+            this.result[key] = this.defRegistry.getFlattenedCollection(
               RegistryKind.Definition
             );
             break;
           case "parameters":
-            this.result[key] = this.defRegistry.getCollection(
+            this.result[key] = this.defRegistry.getFlattenedCollection(
               RegistryKind.Parameter
             );
             break;
           case "responses":
-            this.result[key] = this.defRegistry.getCollection(
+            this.result[key] = this.defRegistry.getFlattenedCollection(
               RegistryKind.Response
             );
             break;
           case "securityDefinitions":
-            this.result[key] = this.defRegistry.getCollection(
+            this.result[key] = this.defRegistry.getFlattenedCollection(
               RegistryKind.SecurityDefinition
             );
             break;

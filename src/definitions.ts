@@ -152,7 +152,7 @@ export class DefinitionRegistry {
       if (match) {
         if (this.referenceStack.includes(refResult.name)) {
           return {
-            $circular: ref,
+            $circular: refResult.name,
           };
         } else {
           let matchCopy = JSON.parse(JSON.stringify(match));
@@ -450,6 +450,34 @@ export class DefinitionRegistry {
       case RegistryKind.SecurityDefinition:
         return Object.fromEntries(this.data.securityDefinitions.data);
     }
+  }
+
+  getRegistryName(registry: RegistryKind): string {
+    switch (registry) {
+      case RegistryKind.Definition:
+        return "definitions";
+      case RegistryKind.Parameter:
+        return "parameters";
+      case RegistryKind.Response:
+        return "responses";
+      case RegistryKind.SecurityDefinition:
+        return "securityDefinitions";
+    }
+  }
+
+  /** Get a flattened collection. */
+  getFlattenedCollection(registry: RegistryKind): any {
+    const collection = this.getCollection(registry);
+    const flattened = new Map<string, any>();
+    for (const [path, values] of Object.entries(collection)) {
+      const normPath = path.replace(/\\/g, "/");
+      for (const [key, value] of (values as Map<string, object>).entries()) {
+        const flatPath = `${normPath}#/${this.getRegistryName(registry)}/${key}`;
+        flattened.set(flatPath, value);
+      }
+    }
+    const sorted = new Map([...flattened.entries()].sort());
+    return Object.fromEntries(sorted);
   }
 
   /** Search a registry for a specific key. */
