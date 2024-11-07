@@ -5,6 +5,7 @@
 - Added functionality to automatically attempt to resolve external references.
 - Added `--lhs-root` and `--rhs-root` options for use with external reference resolution.
 - Fixed issue where `$derivedClasses` could appear in the lhs or rhs output. It should not!
+- Change structure of grouped violations so that it provides a count of violations and sorts the results in descending order by count.
 
 ## 0.1.4 (2024-10-15)
 

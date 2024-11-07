@@ -1,4 +1,4 @@
-import pkg, { Diff, DiffDeleted, DiffEdit, DiffNew } from "deep-diff";
+import pkg, { Diff } from "deep-diff";
 import { getApplicableRules, RuleResult } from "./rules/rules.js";
 import { SwaggerParser } from "./parser.js";
 import yargs from "yargs";
@@ -9,6 +9,11 @@ import * as dotenv from "dotenv";
 import { VERSION } from "./version.js";
 import * as fs from "fs";
 import { loadPaths } from "./util.js";
+import {
+  DiffItem,
+  writeFlatViolations,
+  writeGroupedViolations,
+} from "./diff-file.js";
 
 dotenv.config();
 
@@ -212,14 +217,14 @@ async function main() {
     return 0;
   }
   // write out the diff.json file based on the grouping preference
-  const normalFilename = "diff.json";
-  const inverseFilename = "diff-inv.json";
+  const normalPath = `${outputFolder}/diff.json`;
+  const inversePath = `${outputFolder}/diff-inv.json`;
   if (groupViolations) {
-    writeGroupedViolations(allViolations, normalFilename);
-    writeGroupedViolations(results.noViolations, inverseFilename);
+    writeGroupedViolations(allViolations, normalPath);
+    writeGroupedViolations(results.noViolations, inversePath);
   } else {
-    writeFlatViolations(allViolations, normalFilename);
-    writeFlatViolations(results.noViolations, inverseFilename);
+    writeFlatViolations(allViolations, normalPath);
+    writeFlatViolations(results.noViolations, inversePath);
   }
   // add up the length of each array
   const summary: ResultSummary = {
@@ -269,28 +274,6 @@ async function main() {
   }
   console.warn(epilogue);
   return 1;
-}
-
-async function writeGroupedViolations(
-  differences: DiffItem[],
-  filename: string
-) {
-  const defaultRule = "assumedViolation";
-  const groupedDiff: { [key: string]: DiffItem[] } = {};
-  for (const diff of differences) {
-    const ruleName = diff.ruleName ?? defaultRule;
-    if (!groupedDiff[ruleName]) {
-      groupedDiff[ruleName] = [];
-    }
-    groupedDiff[ruleName]?.push(diff);
-  }
-  const diffPath = `${args["output-folder"]}/${filename}`;
-  fs.writeFileSync(diffPath, JSON.stringify(groupedDiff, null, 2));
-}
-
-async function writeFlatViolations(differences: DiffItem[], filename: string) {
-  const diffPath = `${args["output-folder"]}/${filename}`;
-  fs.writeFileSync(diffPath, JSON.stringify(differences, null, 2));
 }
 
 /** Deletes a specified path from a given OpenAPI document. */
@@ -405,13 +388,6 @@ function processRules(
     }
   }
   return retVal as DiffItem;
-}
-
-export interface DiffItem {
-  ruleResult: RuleResult;
-  ruleName?: string;
-  message?: string;
-  diff: DiffNew<any> | DiffEdit<any, any> | DiffDeleted<any>;
 }
 
 export interface DiffResult {

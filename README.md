@@ -33,7 +33,8 @@ but will not search subfolders.
   `@azure-tools/autorest` emitter. If existing Swagger files are found, they will be overwritten
   by the compilation.
 - `--group-violations`: The tool will group violations by rule within `diff.json`, rather than
-  listing them as a flat collection.
+  listing them as a flat collection. It will include a count of violations and the file will
+  be sorted in descending order by count.
 - `--output-folder`: The folder to write the output files to. If not specified, the output will be
   written to `./output`. The output folder is cleared with each run.
 - `--typespec-compiler-path`: The path to the `@typespec/compiler` package. If not specified, the
