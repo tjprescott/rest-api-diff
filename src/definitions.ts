@@ -190,6 +190,7 @@ export class DefinitionRegistry {
       }
     } else {
       const expanded: any = {};
+      this.#expandDerivedClasses(item);
       this.#expandAllOf(item);
       for (const [propName, propValue] of Object.entries(item).toSorted()) {
         expanded[propName] = this.#expand(propValue);
@@ -206,6 +207,32 @@ export class DefinitionRegistry {
       expanded.push(expVal);
     }
     return expanded;
+  }
+
+  #expandDerivedClasses(base: any): any {
+    const derivedClasses = base.$derivedClasses;
+    delete base.$derivedClasses;
+    if (!derivedClasses) {
+      return base;
+    }
+    const anyOf = [];
+    for (const derived of derivedClasses) {
+      const refResult = parseReference(
+        derived,
+        this.rootPath,
+        this.currentPath
+      );
+      if (!refResult) {
+        throw new Error(`Could not parse reference: ${derived}`);
+      }
+      const derivedClass = this.get(refResult);
+      if (derivedClass === undefined) {
+        throw new Error(`Could not resolve reference: ${derived}`);
+      }
+      anyOf.push(derivedClass);
+    }
+    base.$anyOf = anyOf;
+    return base;
   }
 
   #expandAllOf(base: any): any {
@@ -307,35 +334,14 @@ export class DefinitionRegistry {
     for (const [path, values] of collection.data.entries()) {
       this.currentPath = path;
       for (const [key, value] of values.entries()) {
-        let expanded = this.#expand(value, key);
+        let expanded = this.#expand(value, key, path);
         collection.data.get(path)!.set(key, expanded);
       }
     }
     // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
     for (const [path, values] of collection.data.entries()) {
       for (const [_, value] of values) {
-        const derivedClasses = value["$derivedClasses"];
-        delete value["$derivedClasses"];
-        if (!derivedClasses) {
-          continue;
-        }
-        value["$anyOf"] = [];
-        for (const derived of derivedClasses) {
-          const refResult = parseReference(derived, this.rootPath, path);
-          if (!refResult) {
-            throw new Error(`Could not parse reference: ${derived}`);
-          }
-          const derivedClass = this.get(refResult);
-          if (derivedClass === undefined) {
-            this.logUnresolvedReference(derived);
-            continue;
-          }
-          value["$anyOf"].push(derivedClass);
-        }
-        // a union of one thing is not important
-        if (value["$anyOf"].length < 2) {
-          delete value["$anyOf"];
-        }
+        this.#expandDerivedClasses(value);
       }
     }
     this.#expandReferenceMap();
