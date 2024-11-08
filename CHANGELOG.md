@@ -1,6 +1,10 @@
 # @azure-tools/rest-api-diff
 
-## 0.1.5 (TBD)
+## 0.1.6 (TBD)
+
+TBD
+
+## 0.1.5 (2024-11-08)
 
 - Added functionality to automatically attempt to resolve external references.
 - Added `--lhs-root` and `--rhs-root` options for use with external reference resolution.
