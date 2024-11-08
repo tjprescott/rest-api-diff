@@ -1,14 +1,19 @@
-import pkg, { Diff, DiffDeleted, DiffEdit, DiffNew } from "deep-diff";
+import pkg, { Diff } from "deep-diff";
 import { getApplicableRules, RuleResult } from "./rules/rules.js";
-import * as fs from "fs";
 import { SwaggerParser } from "./parser.js";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 const { diff } = pkg;
 import { OpenAPIV2 } from "openapi-types";
-import { exec } from "child_process";
 import * as dotenv from "dotenv";
 import { VERSION } from "./version.js";
+import * as fs from "fs";
+import { loadPaths } from "./util.js";
+import {
+  DiffItem,
+  writeFlatViolations,
+  writeGroupedViolations,
+} from "./diff-file.js";
 
 dotenv.config();
 
@@ -21,8 +26,6 @@ interface ResultSummary {
 }
 
 export const epilogue = `This tool is under active development. If you experience issues or have questions, please contact Travis Prescott directly (trpresco@microsoft.com). [Tool version: ${VERSION}]`;
-
-const typespecOutputDir = `${process.cwd()}/tsp-output`;
 
 const args = await yargs(hideBin(process.argv))
   .usage("Usage: $0 --lhs [path...] --rhs [path...]")
@@ -43,6 +46,18 @@ const args = await yargs(hideBin(process.argv))
       "The files to compare against. Can be an array of files or directories. Directories will be crawled for JSON files. Non-Swagger files will be ignored.",
     coerce: (arg) => arg.map(String),
     default: process.env.RHS ? process.env.RHS.split(" ") : undefined,
+  })
+  .options("lhs-root", {
+    type: "string",
+    describe:
+      "The root path to use when resolving relative LHS file references. If only one value is specified, assumes that. Otherwise, assumes cwd.",
+    default: process.env.LHS_ROOT,
+  })
+  .options("rhs-root", {
+    type: "string",
+    describe:
+      "The root path to use when resolving relative RHS file references. If only one value is specified, assumes that. Otherwise, assumes cwd.",
+    default: process.env.RHS_ROOT,
   })
   .options("compile-tsp", {
     type: "boolean",
@@ -106,161 +121,24 @@ process.on("uncaughtException", (error) => {
 
 await main();
 
-/**
- * Loads Swagger files. If the file is not a Swagger file, it will return undefined.
- */
-async function loadSwaggerFile(path: string): Promise<any | undefined> {
-  const fileContent = fs.readFileSync(path, "utf-8");
-  try {
-    const jsonContent = JSON.parse(fileContent);
-    if (!jsonContent.swagger) {
-      return undefined;
-    }
-    return jsonContent;
-  } catch (error) {
-    return undefined;
-  }
-}
-
-async function loadFolder(path: string): Promise<Map<string, any> | undefined> {
-  const jsonContents = new Map<string, any>();
-  const pathsToLoad = fs.readdirSync(path);
-  for (const filepath of pathsToLoad) {
-    const fullPath = `${path}/${filepath}`;
-    const filePathStats = fs.statSync(fullPath);
-    // TODO: For now, don't crawl subdirectories.
-    if (filePathStats.isDirectory()) {
-      continue;
-    }
-    const contents = await loadSwaggerFile(fullPath);
-    if (contents) {
-      jsonContents.set(filepath, contents);
-    }
-  }
-  if (jsonContents.size === 0) {
-    return undefined;
-  }
-  return jsonContents;
-}
-
-/**
- * Attempts to compile TypeSpec in a given folder if no Swagger was found.
- */
-async function compileTypespec(
-  path: string
-): Promise<Map<string, any> | undefined> {
-  const compilerPath = args["typespec-compiler-path"];
-  const isDir = fs.statSync(path).isDirectory();
-  if (isDir) {
-    // ensure there is a typespec file in the folder
-    const files = fs.readdirSync(path);
-    const typespecFiles = files.filter((file) => file.endsWith(".tsp"));
-    if (typespecFiles.length === 0) {
-      return undefined;
-    }
-  }
-  const tspCommand = compilerPath
-    ? `node ${compilerPath}/entrypoints/cli.js`
-    : "tsp";
-  const options = [
-    `--option=@azure-tools/typespec-autorest.emitter-output-dir=${typespecOutputDir}`,
-    `--option=@azure-tools/typespec-autorest.output-file=openapi.json`,
-  ];
-  if (args["typespec-version-selector"]) {
-    const version = args["typespec-version-selector"];
-    options.push(`--option=@azure-tools/typespec-autorest.version=${version}`);
-  }
-  if (args["verbose"]) {
-    options.push("--trace=@azure-tools/typespec-autorest");
-  }
-  const command = `${tspCommand} compile ${path} --emit=@azure-tools/typespec-autorest ${options.join(" ")}`;
-  const result = await new Promise((resolve, reject) => {
-    console.log(`Running: ${command}`);
-    exec(command, (error: any, stdout: any, stderr: any) => {
-      if (error) {
-        const errMessage = stdout === "" ? error : stdout;
-        throw new Error(
-          `${errMessage}\nError occurred while compiling TypeSpec!`
-        );
-      }
-      console.log(stdout);
-      resolve(stdout);
-    });
-  });
-  if (!result) {
-    return undefined;
-  }
-  // if successful, there should be a Swagger file in the folder,
-  // so attempt to reload.
-  return await loadFolder(typespecOutputDir);
-}
-
-async function loadFolderContents(path: string): Promise<Map<string, any>> {
-  const compileTsp = args["compile-tsp"];
-  const swaggerValues = await loadFolder(path);
-  // if compile-tsp is set, always attempt to compile TypeSpec files.
-  const typespecValues = compileTsp ? await compileTypespec(path) : undefined;
-  if (compileTsp) {
-    if (!typespecValues && !swaggerValues) {
-      throw new Error(`No Swagger or TypeSpec files found: ${path}`);
-    }
-    return (typespecValues ?? swaggerValues)!;
+function getDefaultRootPath(paths: string[]): string {
+  if (paths.length === 1) {
+    return paths[0];
   } else {
-    if (!swaggerValues) {
-      throw new Error(`No Swagger files found: ${path}`);
-    }
-    return swaggerValues;
-  }
-}
-
-async function loadFile(path: string): Promise<Map<string, any>> {
-  let contents = new Map<string, any>();
-  const compileTsp = args["compile-tsp"];
-  if (path.endsWith(".tsp") && compileTsp) {
-    contents = { ...contents, ...(await compileTypespec(path)) };
-  } else if (path.endsWith(".json")) {
-    contents.set(path, await loadSwaggerFile(path));
-  } else {
-    throw new Error(`Unsupported file type: ${path}`);
-  }
-  if (contents.size === 0) {
-    throw new Error(`No content in file: ${path}`);
-  }
-  return contents;
-}
-
-async function loadPaths(paths: string[]): Promise<Map<string, any>> {
-  let jsonContents = new Map<string, any>();
-  for (const path of paths) {
-    if (!validatePath(path)) {
-      throw new Error(`Invalid path ${path}`);
-    }
-    const stats = fs.statSync(path);
-    const values = stats.isDirectory()
-      ? await loadFolderContents(path)
-      : await loadFile(path);
-    for (const [key, value] of values.entries()) {
-      jsonContents.set(key, value);
-    }
-  }
-  return jsonContents;
-}
-
-function validatePath(path: string): boolean {
-  try {
-    const stats = fs.statSync(path);
-    return stats.isFile() || stats.isDirectory();
-  } catch (error) {
-    return false;
+    return process.cwd();
   }
 }
 
 async function main() {
   const in1 = args.lhs;
+  const lhsRoot = args["lhs-root"] ?? getDefaultRootPath(in1);
   const in2 = args.rhs;
+  const rhsRoot = args["rhs-root"] ?? getDefaultRootPath(in2);
 
-  let lhsParser = new SwaggerParser(await loadPaths(in1));
-  let rhsParser = new SwaggerParser(await loadPaths(in2));
+  let lhsParser = new SwaggerParser(await loadPaths(in1, args), lhsRoot, args);
+  await lhsParser.updateDiscoveredReferences();
+  let rhsParser = new SwaggerParser(await loadPaths(in2, args), rhsRoot, args);
+  await rhsParser.updateDiscoveredReferences();
   const lhs = lhsParser.parse().asJSON();
   const rhs = rhsParser.parse().asJSON();
 
@@ -339,14 +217,14 @@ async function main() {
     return 0;
   }
   // write out the diff.json file based on the grouping preference
-  const normalFilename = "diff.json";
-  const inverseFilename = "diff-inv.json";
+  const normalPath = `${outputFolder}/diff.json`;
+  const inversePath = `${outputFolder}/diff-inv.json`;
   if (groupViolations) {
-    writeGroupedViolations(allViolations, normalFilename);
-    writeGroupedViolations(results.noViolations, inverseFilename);
+    writeGroupedViolations(allViolations, normalPath);
+    writeGroupedViolations(results.noViolations, inversePath);
   } else {
-    writeFlatViolations(allViolations, normalFilename);
-    writeFlatViolations(results.noViolations, inverseFilename);
+    writeFlatViolations(allViolations, normalPath);
+    writeFlatViolations(results.noViolations, inversePath);
   }
   // add up the length of each array
   const summary: ResultSummary = {
@@ -396,28 +274,6 @@ async function main() {
   }
   console.warn(epilogue);
   return 1;
-}
-
-async function writeGroupedViolations(
-  differences: DiffItem[],
-  filename: string
-) {
-  const defaultRule = "assumedViolation";
-  const groupedDiff: { [key: string]: DiffItem[] } = {};
-  for (const diff of differences) {
-    const ruleName = diff.ruleName ?? defaultRule;
-    if (!groupedDiff[ruleName]) {
-      groupedDiff[ruleName] = [];
-    }
-    groupedDiff[ruleName]?.push(diff);
-  }
-  const diffPath = `${args["output-folder"]}/${filename}`;
-  fs.writeFileSync(diffPath, JSON.stringify(groupedDiff, null, 2));
-}
-
-async function writeFlatViolations(differences: DiffItem[], filename: string) {
-  const diffPath = `${args["output-folder"]}/${filename}`;
-  fs.writeFileSync(diffPath, JSON.stringify(differences, null, 2));
 }
 
 /** Deletes a specified path from a given OpenAPI document. */
@@ -532,13 +388,6 @@ function processRules(
     }
   }
   return retVal as DiffItem;
-}
-
-export interface DiffItem {
-  ruleResult: RuleResult;
-  ruleName?: string;
-  message?: string;
-  diff: DiffNew<any> | DiffEdit<any, any> | DiffDeleted<any>;
 }
 
 export interface DiffResult {
