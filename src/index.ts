@@ -139,8 +139,10 @@ async function main() {
   await lhsParser.updateDiscoveredReferences();
   let rhsParser = new SwaggerParser(await loadPaths(in2, args), rhsRoot, args);
   await rhsParser.updateDiscoveredReferences();
-  const lhs = lhsParser.parse().asJSON();
-  const rhs = rhsParser.parse().asJSON();
+  let lhs = lhsParser.parse().asJSON();
+  let rhs = rhsParser.parse().asJSON();
+
+  [lhs, rhs] = shortenKeys(lhs, rhs);
 
   // sort the diffs into three buckets: flagged violations, assumed violations, and no violations
   const results = processDiff(diff(lhs, rhs), lhs, rhs);
@@ -274,6 +276,38 @@ async function main() {
   }
   console.warn(epilogue);
   return 1;
+}
+
+function shortenKeys(
+  inputLhs: OpenAPIV2.Document,
+  inputRhs: OpenAPIV2.Document
+): [OpenAPIV2.Document, OpenAPIV2.Document] {
+  // deep copy the documents
+  let lhs = JSON.parse(JSON.stringify(inputLhs));
+  let rhs = JSON.parse(JSON.stringify(inputRhs));
+
+  const keysToShorten = [
+    "definitions",
+    "parameters",
+    "responses",
+    "securityDefinitions",
+  ];
+
+  for (const doc of [lhs, rhs]) {
+    for (const key of keysToShorten) {
+      const coll = doc[key];
+      // update each key to only take the name after the last forward slash
+      if (coll) {
+        const newLhsCollection: any = {};
+        for (const [lhsKey, val] of Object.entries(coll)) {
+          const lhsShortenedKey = lhsKey.split("/").pop()!;
+          newLhsCollection[lhsShortenedKey] = val;
+        }
+        doc[key] = newLhsCollection;
+      }
+    }
+  }
+  return [lhs, rhs];
 }
 
 /** Deletes a specified path from a given OpenAPI document. */
