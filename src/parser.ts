@@ -2,57 +2,52 @@ import * as crypto from "crypto";
 import { OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
 import { ParameterizedHost } from "./extensions/parameterized-host.js";
-import { isReference, parseReference } from "./util.js";
+import { forceArray, isReference, loadPaths, parseReference } from "./util.js";
 
 /** A class for parsing Swagger files into an expanded, normalized form. */
 export class SwaggerParser {
-  public defRegistry: DefinitionRegistry;
   private parameterizedHost?: ParameterizedHost;
   private defaultConsumes?: string[];
   private defaultProduces?: string[];
   private errorSchemas: Map<string, OpenAPIV2.SchemaObject> = new Map();
   private host?: string;
   private rootPath: string;
-  private swaggerMap: Map<string, any>;
   private result: any = {};
+  private defRegistry?: DefinitionRegistry;
+  private swaggerMap?: Map<string, any>;
 
-  constructor(map: Map<string, any>, rootPath: string, args: any) {
+  private constructor(rootPath: string) {
     this.rootPath = rootPath;
-    this.defRegistry = new DefinitionRegistry(map, rootPath, args);
-    this.swaggerMap = map;
   }
 
-  async updateDiscoveredReferences() {
-    await this.defRegistry.updateDiscoveredReferences();
-  }
-
-  /** Get the parsed result as a JSON object. */
-  asJSON(): any {
-    return this.result;
-  }
-
-  /** Returns the error schemas discovered for this parser. */
-  getErrorSchemas(): Map<string, OpenAPIV2.SchemaObject> {
-    return this.errorSchemas;
-  }
-
-  /** Parse a generic node. */
-  parseNode(obj: any): any {
-    if (obj === undefined || obj === null) {
-      return undefined;
-    }
-    // base case for primitive types
-    if (typeof obj !== "object") {
-      return obj;
-    } else if (Array.isArray(obj)) {
-      return this.#parseArray(obj);
-    } else if (typeof obj === "object") {
-      return this.#parseObject(obj);
-    }
+  /**
+   * Creates a new SwaggerParser instance asynchronously.
+   * @param paths the path or paths to load
+   * @param rootPath the path from which to resolve any relative paths
+   * @param args arguments
+   * @returns initialized SwaggerParser instance
+   */
+  static async create(
+    paths: string | string[],
+    rootPath: string,
+    args: any
+  ): Promise<SwaggerParser> {
+    const parser = new SwaggerParser(rootPath);
+    const pathMap = await loadPaths(forceArray(paths), args);
+    parser.defRegistry = new DefinitionRegistry(pathMap, rootPath, args);
+    parser.swaggerMap = pathMap;
+    await parser.defRegistry.updateDiscoveredReferences();
+    return parser;
   }
 
   /** Special handling for the root of a Swagger object. */
   parse(): SwaggerParser {
+    if (!this.swaggerMap) {
+      throw new Error("Swagger map is not initialized.");
+    }
+    if (!this.defRegistry) {
+      throw new Error("Definition registry is not initialized.");
+    }
     for (const [_, data] of this.swaggerMap.entries()) {
       // Retrieve any top-level defaults that need to be normalized later on.
       this.parameterizedHost = data["x-ms-parameterized-host"];
@@ -71,7 +66,7 @@ export class SwaggerParser {
 
       // combine the paths and x-ms-paths objects
       const allPaths = { ...paths, ...xMsPaths };
-      const newPaths = this.parsePaths(allPaths);
+      const newPaths = this.#parsePaths(allPaths);
       if (!this.result.paths) {
         this.result.paths = {};
       }
@@ -91,7 +86,7 @@ export class SwaggerParser {
           case "security":
           case "tags":
           case "externalDocs":
-            this.result[key] = this.parseNode(val);
+            this.result[key] = this.#parseNode(val);
             break;
           case "definitions":
             this.result[key] = this.defRegistry.getFlattenedCollection(
@@ -121,34 +116,23 @@ export class SwaggerParser {
     return this;
   }
 
-  reportUnresolvedReferences(): void {
-    const unresolvedReferences = this.defRegistry.getUnresolvedReferences();
-    if (unresolvedReferences.length > 0) {
-      console.warn(
-        `== UNRESOLVED REFERENCES == (${unresolvedReferences.length})\n\n`
-      );
-      console.warn(`${unresolvedReferences.join("\n")}`);
-    }
+  /** Get the parsed result as a JSON object. */
+  asJSON(): any {
+    return this.result;
   }
 
-  reportUnreferencedObjects(): void {
-    const unreferencedDefinitions = this.defRegistry.getUnreferenced();
-    // We don't care about unused security definitions because we don't really
-    // use them in Azure. (We will still diff them though)
-    unreferencedDefinitions.delete(RegistryKind.SecurityDefinition);
-    if (unreferencedDefinitions.size > 0) {
-      let total = 0;
-      for (const value of unreferencedDefinitions.values()) {
-        total += value.length;
-      }
-      console.warn(`\n== UNREFERENCED DEFINITIONS == (${total})\n`);
+  /** Parse a generic node. */
+  #parseNode(obj: any): any {
+    if (obj === undefined || obj === null) {
+      return undefined;
     }
-    for (const [key, value] of unreferencedDefinitions.entries()) {
-      if (value.length > 0) {
-        console.warn(
-          `\n**${RegistryKind[key]}** (${value.length})\n\n${value.join("\n")}`
-        );
-      }
+    // base case for primitive types
+    if (typeof obj !== "object") {
+      return obj;
+    } else if (Array.isArray(obj)) {
+      return this.#parseArray(obj);
+    } else if (typeof obj === "object") {
+      return this.#parseObject(obj);
     }
   }
 
@@ -162,10 +146,10 @@ export class SwaggerParser {
           val as object
         ).toSorted()) {
           // normalize header keys to lowercase
-          result[key][headerKey.toLowerCase()] = this.parseNode(headerVal);
+          result[key][headerKey.toLowerCase()] = this.#parseNode(headerVal);
         }
       } else {
-        result[key] = this.parseNode(val);
+        result[key] = this.#parseNode(val);
       }
     }
     return result;
@@ -204,7 +188,7 @@ export class SwaggerParser {
         // Don't expand the default response. We will handle this in a special way.
         const errorName = this.#parseErrorName(data);
         if (!this.errorSchemas.has(errorName)) {
-          const expandedError = this.parseNode(data);
+          const expandedError = this.#parseNode(data);
           this.errorSchemas.set(errorName, expandedError);
         }
         // Later we will revisit and replace all of there with a value indicating they are, or are not, compatible.
@@ -229,7 +213,7 @@ export class SwaggerParser {
         const hostParams = this.parameterizedHost?.parameters ?? [];
         const allParams = [...(val as Array<any>), ...hostParams];
 
-        const expanded = this.parseNode(allParams);
+        const expanded = this.#parseNode(allParams);
         // ensure parameters are sorted by name since this ordering doesn't
         // matter from a REST API perspective.
         const sorted = (expanded as Array<any>).sort((a: any, b: any) => {
@@ -255,7 +239,7 @@ export class SwaggerParser {
       } else if (key === "responses") {
         result[key] = this.#parseResponses(val);
       } else {
-        result[key] = this.parseNode(value[key]);
+        result[key] = this.#parseNode(value[key]);
       }
     }
     return result;
@@ -271,7 +255,7 @@ export class SwaggerParser {
   }
 
   /** Pare the entire Paths object. */
-  parsePaths(value: any): any {
+  #parsePaths(value: any): any {
     let result: any = {};
     for (const [operationPath, pathData] of Object.entries(value).toSorted()) {
       // normalize the path to coerce the naming convention
@@ -287,7 +271,7 @@ export class SwaggerParser {
       const values: any[] = [];
       for (let i = 0; i < value.length; i++) {
         const item = value[i];
-        values.push(this.parseNode(item));
+        values.push(this.#parseNode(item));
       }
       return values;
     } else {
@@ -296,6 +280,9 @@ export class SwaggerParser {
   }
 
   #parseObject(value: any): any {
+    if (!this.defRegistry) {
+      throw new Error("Definition registry is not initialized.");
+    }
     if (isReference(value)) {
       // get the value of the $ref key
       const ref = (value as any)["$ref"];
@@ -335,7 +322,7 @@ export class SwaggerParser {
     const result: any = {};
     // visit each key in the object in sorted order
     for (const [key, val] of Object.entries(value).toSorted()) {
-      result[key] = this.parseNode(val);
+      result[key] = this.#parseNode(val);
     }
     return result;
   }
@@ -372,3 +359,48 @@ export class SwaggerParser {
     return normalizedPath;
   }
 }
+
+// // FIXME: Move this?
+// /** Returns the error schemas discovered for this parser. */
+// #getErrorSchemas(): Map<string, OpenAPIV2.SchemaObject> {
+//   return this.errorSchemas;
+// }
+
+// // FIXME: Move this?
+// #reportUnresolvedReferences(): void {
+//   if (!this.defRegistry) {
+//     throw new Error("Definition registry is not initialized.");
+//   }
+//   const unresolvedReferences = this.defRegistry.getUnresolvedReferences();
+//   if (unresolvedReferences.length > 0) {
+//     console.warn(
+//       `== UNRESOLVED REFERENCES == (${unresolvedReferences.length})\n\n`
+//     );
+//     console.warn(`${unresolvedReferences.join("\n")}`);
+//   }
+// }
+
+// // FIXME: Move this?
+// #reportUnreferencedObjects(): void {
+//   if (!this.defRegistry) {
+//     throw new Error("Definition registry is not initialized.");
+//   }
+//   const unreferencedDefinitions = this.defRegistry.getUnreferenced();
+//   // We don't care about unused security definitions because we don't really
+//   // use them in Azure. (We will still diff them though)
+//   unreferencedDefinitions.delete(RegistryKind.SecurityDefinition);
+//   if (unreferencedDefinitions.size > 0) {
+//     let total = 0;
+//     for (const value of unreferencedDefinitions.values()) {
+//       total += value.length;
+//     }
+//     console.warn(`\n== UNREFERENCED DEFINITIONS == (${total})\n`);
+//   }
+//   for (const [key, value] of unreferencedDefinitions.entries()) {
+//     if (value.length > 0) {
+//       console.warn(
+//         `\n**${RegistryKind[key]}** (${value.length})\n\n${value.join("\n")}`
+//       );
+//     }
+//   }
+// }

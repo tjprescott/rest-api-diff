@@ -267,3 +267,8 @@ async function compileTypespec(
   // so attempt to reload.
   return await loadFolder(typespecOutputDir);
 }
+
+/** Converts a single value or array to an array. */
+export function forceArray<T>(value: T | T[]): T[] {
+  return Array.isArray(value) ? value : [value];
+}

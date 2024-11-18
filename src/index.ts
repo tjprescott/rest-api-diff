@@ -103,15 +103,15 @@ process.on("uncaughtException", (error) => {
 await main();
 
 async function main() {
-  const client = new DiffClient({
+  const client = await DiffClient.create({
     lhs: args.lhs,
     rhs: args.rhs,
     args: args,
   });
-  await client.buildParsers();
   client.parse();
   client.processDiff();
-  const diffResults = client.diffResults;
+  client.buildOutput();
+  client.writeOutput();
   console.warn(epilogue);
   return 1;
 }
