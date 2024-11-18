@@ -6,14 +6,6 @@ import { DiffClient } from "./diff-client.js";
 
 dotenv.config();
 
-interface ResultSummary {
-  flaggedViolations: number;
-  rulesViolated: number | undefined;
-  assumedViolations: number;
-  unresolvedReferences: number;
-  unreferencedObjects: number;
-}
-
 export const epilogue = `This tool is under active development. If you experience issues or have questions, please contact Travis Prescott directly (trpresco@microsoft.com). [Tool version: ${VERSION}]`;
 
 const args = await yargs(hideBin(process.argv))
@@ -116,7 +108,10 @@ async function main() {
     rhs: args.rhs,
     args: args,
   });
-  await client.run();
+  await client.buildParsers();
+  client.parse();
+  client.processDiff();
+  const diffResults = client.diffResults;
   console.warn(epilogue);
   return 1;
 }

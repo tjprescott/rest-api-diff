@@ -1,11 +1,13 @@
 import { Diff } from "deep-diff";
 import { RuleResult } from "./rules.js";
 
-export function ignoreXMsErrorCodeHeaderRule(data: Diff<any, any>): RuleResult {
-  if (!data.path) return RuleResult.ContinueProcessing;
-  if (data.kind !== "N") return RuleResult.ContinueProcessing;
+export function ignoreXMsErrorCodeHeaderRule(
+  data: Diff<any, any>
+): RuleResult | undefined {
+  if (!data.path) return;
+  if (data.kind !== "N") return;
   const lastPath = data.path.slice(-1)[0];
-  if (lastPath !== "headers") return RuleResult.ContinueProcessing;
+  if (lastPath !== "headers") return;
 
   const headers = data.rhs;
   const headerKeys = Object.keys(headers);
@@ -18,8 +20,6 @@ export function ignoreXMsErrorCodeHeaderRule(data: Diff<any, any>): RuleResult {
         `x-ms-error-code header is not the only header in the response.`,
         data
       );
-      return RuleResult.ContinueProcessing;
     }
   }
-  return RuleResult.ContinueProcessing;
 }

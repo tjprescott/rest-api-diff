@@ -8,13 +8,14 @@ const specificPathsToIgnore = [
   "securityDefinitions",
 ];
 
-export function ignoreSwaggerDefintionsRule(data: Diff<any, any>): RuleResult {
-  if (!data.path) return RuleResult.ContinueProcessing;
+export function ignoreSwaggerDefintionsRule(
+  data: Diff<any, any>
+): RuleResult | undefined {
+  if (!data.path) return;
   const fullPath = data.path.join(".");
   for (const pathToIgnore of specificPathsToIgnore) {
     if (fullPath.startsWith(pathToIgnore)) {
       return RuleResult.NoViolation;
     }
   }
-  return RuleResult.ContinueProcessing;
 }

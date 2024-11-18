@@ -12,15 +12,14 @@ const propertValuesToIgnore: Map<string, any> = new Map([
  */
 export function ignoreIrrelevantResponsePropertiesRule(
   data: Diff<any, any>
-): RuleResult {
-  if (!data.path) return RuleResult.ContinueProcessing;
+): RuleResult | undefined {
+  if (!data.path) return;
   const path = data.path;
-  if (path.length < 4) return RuleResult.ContinueProcessing;
-  if (path[3] !== "responses") return RuleResult.ContinueProcessing;
+  if (path.length < 4) return;
+  if (path[3] !== "responses") return;
   const lastPath = path[path.length - 1];
   const valueToIgnore = propertValuesToIgnore.get(lastPath);
-  if (valueToIgnore === undefined) return RuleResult.ContinueProcessing;
+  if (valueToIgnore === undefined) return;
   const value = (data as any).lhs ?? (data as any).rhs;
   if (value === valueToIgnore) return RuleResult.NoViolation;
-  return RuleResult.ContinueProcessing;
 }

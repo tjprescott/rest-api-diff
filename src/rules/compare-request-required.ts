@@ -6,11 +6,11 @@ import { RuleResult } from "./rules.js";
  */
 export function compareRequestRequiredRule(
   data: Diff<any, any>
-): RuleResult | [RuleResult, string] {
-  if (!data.path) return RuleResult.ContinueProcessing;
+): RuleResult | [RuleResult, string] | undefined {
+  if (!data.path) return;
   const path = data.path.join(".");
-  if (!path.endsWith("required")) return RuleResult.ContinueProcessing;
-  if (!path.includes("parameters")) return RuleResult.ContinueProcessing;
+  if (!path.endsWith("required")) return;
+  if (!path.includes("parameters")) return;
   if (data.kind === "D") {
     return RuleResult.NoViolation;
   }
@@ -18,5 +18,4 @@ export function compareRequestRequiredRule(
     const message = `Reqest parameter '${path}' is not required in the LHS but is in the RHS.`;
     return [RuleResult.FlaggedViolation, message];
   }
-  return RuleResult.ContinueProcessing;
 }
