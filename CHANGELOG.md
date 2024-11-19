@@ -1,5 +1,9 @@
 # @azure-tools/rest-api-diff
 
+## 0.1.7 (TBD)
+
+- Fixed issue where paths were being sorted correctly, leading to unreadable visual diffs.
+
 ## 0.1.6 (2024-11-19)
 
 - Fixed issue where flags did not work correctly when supplied on the command line.

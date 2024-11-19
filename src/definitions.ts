@@ -502,7 +502,17 @@ export class DefinitionRegistry {
         flattened.set(flatPath, value);
       }
     }
-    const sorted = new Map([...flattened.entries()].sort());
+    const sorted = new Map(
+      [...flattened.entries()].sort((a: any, b: any) => {
+        if (a.name < b.name) {
+          return -1;
+        } else if (a.name > b.name) {
+          return 1;
+        } else {
+          return 0;
+        }
+      })
+    );
     return Object.fromEntries(sorted);
   }
 

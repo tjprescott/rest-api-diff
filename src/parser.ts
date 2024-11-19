@@ -48,6 +48,7 @@ export class SwaggerParser {
     if (!this.defRegistry) {
       throw new Error("Definition registry is not initialized.");
     }
+    const allPathsUnsorted: any = {};
     for (const [_, data] of this.swaggerMap.entries()) {
       // Retrieve any top-level defaults that need to be normalized later on.
       this.parameterizedHost = data["x-ms-parameterized-host"];
@@ -64,14 +65,11 @@ export class SwaggerParser {
       delete data["paths"];
       delete data["x-ms-paths"];
 
-      // combine the paths and x-ms-paths objects
+      // combine the paths and x-ms-paths objects and merge into overall paths object
       const allPaths = { ...paths, ...xMsPaths };
       const newPaths = this.#parsePaths(allPaths);
-      if (!this.result.paths) {
-        this.result.paths = {};
-      }
-      for (const [path, data] of Object.entries(newPaths).toSorted()) {
-        this.result.paths[path] = data;
+      for (const [path, data] of Object.entries(newPaths)) {
+        allPathsUnsorted[path] = data;
       }
 
       for (const [key, val] of Object.entries(data).toSorted()) {
@@ -112,6 +110,20 @@ export class SwaggerParser {
             throw new Error(`Unhandled root key: ${key}`);
         }
       }
+    }
+    // sort all the paths and add into the result
+    const allSortedPaths = Object.entries(allPathsUnsorted).sort((a, b) => {
+      if (a[0] < b[0]) {
+        return -1;
+      } else if (a[0] > b[0]) {
+        return 1;
+      } else {
+        return 0;
+      }
+    });
+    this.result.paths = {};
+    for (const [path, data] of allSortedPaths) {
+      this.result.paths[path] = data;
     }
     return this;
   }
@@ -286,7 +298,7 @@ export class SwaggerParser {
   /** Pare the entire Paths object. */
   #parsePaths(value: any): any {
     let result: any = {};
-    for (const [operationPath, pathData] of Object.entries(value).toSorted()) {
+    for (const [operationPath, pathData] of Object.entries(value)) {
       // normalize the path to coerce the naming convention
       const normalizedPath = this.#normalizePath(operationPath);
       result[normalizedPath] = this.#parseVerbs(pathData);
@@ -294,7 +306,7 @@ export class SwaggerParser {
     return result;
   }
 
-  #parseArray(value: any[], kind?: RegistryKind): any {
+  #parseArray(value: any[]): any {
     // visit array objects but not arrays of primitives
     if (value.length > 0 && typeof value[0] === "object") {
       const values: any[] = [];
