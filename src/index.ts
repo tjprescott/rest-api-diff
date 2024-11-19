@@ -44,14 +44,12 @@ const args = await yargs(hideBin(process.argv))
     type: "boolean",
     describe:
       "If TypeSpec files are found, attempt to compile the TypeSpec to Swagger using @typespec-autorest.",
-    coerce: (arg) => arg === "true",
     default: process.env.COMPILE_TSP,
   })
   .options("group-violations", {
     type: "boolean",
     describe:
       "Group violations by rule name. If false, will output all violations in a flat collection.",
-    coerce: (arg) => arg === "true",
     default: process.env.GROUP_VIOLATIONS,
   })
   .options("output-folder", {
@@ -75,13 +73,11 @@ const args = await yargs(hideBin(process.argv))
     type: "boolean",
     describe:
       "Preserve defintions, parameters, responses, and securityDefinitions in the output. ",
-    coerce: (arg) => arg === "true",
     default: process.env.PRESERVE_DEFINITIONS,
   })
   .options("verbose", {
     type: "boolean",
     describe: "Print verbose output.",
-    coerce: (arg) => arg === "true",
     default: process.env.VERBOSE,
   })
   .wrap(120)

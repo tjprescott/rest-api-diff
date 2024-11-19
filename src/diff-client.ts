@@ -16,6 +16,7 @@ import {
 import { OpenAPIV2 } from "openapi-types";
 import { epilogue } from "./index.js";
 import assert from "assert";
+import { RegistryKind } from "./definitions.js";
 
 export interface DiffClientConfig {
   lhs: string | string[];
@@ -49,9 +50,9 @@ export class DiffClient {
     const lhs = client.args["lhs"];
     const rhs = client.args["rhs"];
     const lhsRoot =
-      config.args["lhs-root"] ?? client.getDefaultRootPath("lhs", lhs);
+      config.args["lhs-root"] ?? client.#getDefaultRootPath("lhs", lhs);
     const rhsRoot =
-      config.args["rhs-root"] ?? client.getDefaultRootPath("rhs", rhs);
+      config.args["rhs-root"] ?? client.#getDefaultRootPath("rhs", rhs);
 
     const lhsParser = await SwaggerParser.create(lhs, lhsRoot, client.args);
     const rhsParser = await SwaggerParser.create(rhs, rhsRoot, client.args);
@@ -98,8 +99,8 @@ export class DiffClient {
     }
     // now that the document is parsed, shorten the keys so they are
     // more likely to match in the diff.
-    this.lhs = this.shortenKeysForDocument(lhs);
-    this.rhs = this.shortenKeysForDocument(rhs);
+    this.lhs = this.#shortenKeysForDocument(lhs);
+    this.rhs = this.#shortenKeysForDocument(rhs);
     this.keysShortened = true;
   }
 
@@ -201,12 +202,12 @@ export class DiffClient {
 
     this.resultFiles = {
       raw: [this.lhs, this.rhs],
-      normal: this.pruneDocuments(
+      normal: this.#pruneDocuments(
         this.lhs,
         this.rhs,
         this.diffResults.noViolations
       ),
-      inverse: this.pruneDocuments(this.lhs, this.rhs, allViolations),
+      inverse: this.#pruneDocuments(this.lhs, this.rhs, allViolations),
     };
   }
 
@@ -220,6 +221,11 @@ export class DiffClient {
     if (!this.diffResults) {
       throw new Error(
         "Diff results have not been processed. Call processDiff() first."
+      );
+    }
+    if (!this.lhsParser || !this.rhsParser) {
+      throw new Error(
+        "Parsers have not been initialized. Call buildParsers() first."
       );
     }
     const results = this.resultFiles;
@@ -265,17 +271,16 @@ export class DiffClient {
     );
     // Report unresolved and unreferenced objects
     if (this.args["verbose"]) {
-      // FIXME: Restore this functionality
-      // console.warn("=== LEFT-HAND SIDE ===");
-      // this.lhsParser.reportUnresolvedReferences();
-      // if (!this.args["preserve-definitions"]) {
-      //   this.lhsParser.reportUnreferencedObjects();
-      // }
-      // console.warn("\n=== RIGHT-HAND SIDE ===");
-      // this.rhsParser.reportUnresolvedReferences();
-      // if (!this.args["preserve-definitions"]) {
-      //   this.rhsParser.reportUnreferencedObjects();
-      // }
+      console.warn("=== LEFT-HAND SIDE ===");
+      this.#reportUnresolvedReferences(this.lhsParser);
+      if (!this.args["preserve-definitions"]) {
+        this.#reportUnreferencedObjects(this.lhsParser);
+      }
+      console.warn("\n=== RIGHT-HAND SIDE ===");
+      this.#reportUnresolvedReferences(this.rhsParser);
+      if (!this.args["preserve-definitions"]) {
+        this.#reportUnreferencedObjects(this.rhsParser);
+      }
     }
     const groupViolations = this.args["group-violations"];
     const allViolations = [
@@ -296,59 +301,57 @@ export class DiffClient {
       writeFlatViolations(allViolations, normalPath);
       writeFlatViolations(this.diffResults.noViolations, inversePath);
     }
-    // FIXME: Restore this functionality
-    // // add up the length of each array
-    // const summary: ResultSummary = {
-    //   flaggedViolations: this.diffResults.flaggedViolations.length,
-    //   assumedViolations: this.diffResults.assumedViolations.length,
-    //   rulesViolated: groupViolations
-    //     ? new Set(allViolations.map((x) => x.ruleName)).size
-    //     : undefined,
-    //   unresolvedReferences:
-    //     this.rhsParser.defRegistry.getUnresolvedReferences().length,
-    //   unreferencedObjects: this.rhsParser.defRegistry.getUnreferencedTotal(),
-    // };
-    // console.warn("\n== ISSUES FOUND! ==\n");
-    // const preserveDefinitions = this.args["preserve-definitions"];
-    // if (summary.flaggedViolations) {
-    //   if (summary.rulesViolated) {
-    //     console.warn(
-    //       `Flagged Violations: ${summary.flaggedViolations} across ${summary.rulesViolated} rules`
-    //     );
-    //   } else {
-    //     console.warn(`Flagged Violations: ${summary.flaggedViolations}`);
-    //   }
-    // }
-    // if (summary.assumedViolations) {
-    //   console.warn(`Assumed Violations: ${summary.assumedViolations}`);
-    // }
-    // if (summary.unresolvedReferences) {
-    //   console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
-    // }
-    // if (!preserveDefinitions && summary.unreferencedObjects) {
-    //   console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
-    // }
-    // console.warn("\n");
-    // console.warn(
-    //   `See '${outputFolder}' for details. See 'lhs.json', 'rhs.json' and 'diff.json'.`
-    // );
-    // if (
-    //   !preserveDefinitions &&
-    //   (summary.unresolvedReferences || summary.unreferencedObjects)
-    // ) {
-    //   console.warn(
-    //     "Try running with `--preserve-defintions` to include unreferenced definitions in the comparison"
-    //   );
-    //   if (!this.args["verbose"]) {
-    //     console.warn(
-    //       "or run with `--verbose` to see more detailed information."
-    //     );
-    //   }
-    // }
+    // add up the length of each array
+    const summary: ResultSummary = {
+      flaggedViolations: this.diffResults.flaggedViolations.length,
+      assumedViolations: this.diffResults.assumedViolations.length,
+      rulesViolated: groupViolations
+        ? new Set(allViolations.map((x) => x.ruleName)).size
+        : undefined,
+      unresolvedReferences: this.rhsParser.getUnresolvedReferences().length,
+      unreferencedObjects: this.rhsParser.getUnreferencedTotal(),
+    };
+    console.warn("\n== ISSUES FOUND! ==\n");
+    const preserveDefinitions = this.args["preserve-definitions"];
+    if (summary.flaggedViolations) {
+      if (summary.rulesViolated) {
+        console.warn(
+          `Flagged Violations: ${summary.flaggedViolations} across ${summary.rulesViolated} rules`
+        );
+      } else {
+        console.warn(`Flagged Violations: ${summary.flaggedViolations}`);
+      }
+    }
+    if (summary.assumedViolations) {
+      console.warn(`Assumed Violations: ${summary.assumedViolations}`);
+    }
+    if (summary.unresolvedReferences) {
+      console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
+    }
+    if (!preserveDefinitions && summary.unreferencedObjects) {
+      console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
+    }
+    console.warn("\n");
+    console.warn(
+      `See '${outputFolder}' for details. See 'lhs.json', 'rhs.json' and 'diff.json'.`
+    );
+    if (
+      !preserveDefinitions &&
+      (summary.unresolvedReferences || summary.unreferencedObjects)
+    ) {
+      console.warn(
+        "Try running with `--preserve-defintions` to include unreferenced definitions in the comparison"
+      );
+      if (!this.args["verbose"]) {
+        console.warn(
+          "or run with `--verbose` to see more detailed information."
+        );
+      }
+    }
   }
 
   /** Logs a message to console if --verbose is set. */
-  private logIfVerbose(message: string) {
+  #logIfVerbose(message: string) {
     if (this.args["verbose"]) {
       console.log(message);
     }
@@ -360,7 +363,7 @@ export class DiffClient {
    * @param side the side to get the default root path for. Used for the logging message only.
    * @param paths the paths to use to determine the default root path.
    */
-  private getDefaultRootPath(side: "lhs" | "rhs", paths: string[]): string {
+  #getDefaultRootPath(side: "lhs" | "rhs", paths: string[]): string {
     let defaultPath: string = "";
     if (paths.length === 1) {
       // if the one path is a file, use the folder, otherwise use the path
@@ -373,7 +376,7 @@ export class DiffClient {
     } else {
       defaultPath = process.cwd();
     }
-    this.logIfVerbose(`Default ${side} root path: ${defaultPath}`);
+    this.#logIfVerbose(`Default ${side} root path: ${defaultPath}`);
     return defaultPath;
   }
 
@@ -383,9 +386,7 @@ export class DiffClient {
    * @param source the source document to shorten keys for
    * @returns a new document with shortened keys
    */
-  private shortenKeysForDocument(
-    source: OpenAPIV2.Document
-  ): OpenAPIV2.Document {
+  #shortenKeysForDocument(source: OpenAPIV2.Document): OpenAPIV2.Document {
     // deep copy the documents
     let doc = JSON.parse(JSON.stringify(source));
 
@@ -415,10 +416,7 @@ export class DiffClient {
    * Returns a copy of the provided document with the specified
    * paths removed.
    */
-  private deletePaths(
-    doc: OpenAPIV2.Document,
-    paths: string[][]
-  ): OpenAPIV2.Document {
+  #deletePaths(doc: OpenAPIV2.Document, paths: string[][]): OpenAPIV2.Document {
     const copy = { ...doc };
     for (const path of paths) {
       // reset to document root
@@ -441,7 +439,7 @@ export class DiffClient {
    * @param differences the differences you want to prune
    * @returns a tuple of the pruned left-hand side and right-hand side documents
    */
-  private pruneDocuments(
+  #pruneDocuments(
     inputLhs: OpenAPIV2.Document,
     inputRhs: OpenAPIV2.Document,
     differences: DiffItem[]
@@ -456,11 +454,11 @@ export class DiffClient {
     const rhsDiffs = differences.filter(
       (x) => (x.diff as any).rhs !== undefined
     );
-    lhs = this.deletePaths(
+    lhs = this.#deletePaths(
       lhs,
       lhsDiffs.map((x) => x.diff.path!)
     );
-    rhs = this.deletePaths(
+    rhs = this.#deletePaths(
       rhs,
       rhsDiffs.map((x) => x.diff.path!)
     );
@@ -480,6 +478,37 @@ export class DiffClient {
       }
     }
     return [lhs, rhs];
+  }
+
+  #reportUnresolvedReferences(parser: SwaggerParser): void {
+    const unresolvedReferences = parser.getUnresolvedReferences();
+    if (unresolvedReferences.length > 0) {
+      console.warn(
+        `== UNRESOLVED REFERENCES == (${unresolvedReferences.length})\n\n`
+      );
+      console.warn(`${unresolvedReferences.join("\n")}`);
+    }
+  }
+
+  #reportUnreferencedObjects(parser: SwaggerParser): void {
+    const unreferencedDefinitions = parser.getUnreferenced();
+    // We don't care about unused security definitions because we don't really
+    // use them in Azure. (We will still diff them though)
+    unreferencedDefinitions.delete(RegistryKind.SecurityDefinition);
+    if (unreferencedDefinitions.size > 0) {
+      let total = 0;
+      for (const value of unreferencedDefinitions.values()) {
+        total += value.length;
+      }
+      console.warn(`\n== UNREFERENCED DEFINITIONS == (${total})\n`);
+    }
+    for (const [key, value] of unreferencedDefinitions.entries()) {
+      if (value.length > 0) {
+        console.warn(
+          `\n**${RegistryKind[key]}** (${value.length})\n\n${value.join("\n")}`
+        );
+      }
+    }
   }
 }
 

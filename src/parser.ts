@@ -121,6 +121,35 @@ export class SwaggerParser {
     return this.result;
   }
 
+  /** Returns the error schemas discovered by the parser. */
+  getErrorSchemas(): Map<string, OpenAPIV2.SchemaObject> {
+    return this.errorSchemas;
+  }
+
+  /** Returns the unresolved references discovered by the parser. */
+  getUnresolvedReferences(): string[] {
+    if (!this.defRegistry) {
+      throw new Error("Definition registry is not initialized.");
+    }
+    return this.defRegistry.getUnresolvedReferences();
+  }
+
+  /** Returns unreferenced items. */
+  getUnreferenced(): Map<RegistryKind, string[]> {
+    if (!this.defRegistry) {
+      throw new Error("Definition registry is not initialized.");
+    }
+    return this.defRegistry.getUnreferenced();
+  }
+
+  /** Returns the total number of unreferenced definitions. */
+  getUnreferencedTotal(): number {
+    if (!this.defRegistry) {
+      throw new Error("Definition registry is not initialized.");
+    }
+    return this.defRegistry.getUnreferencedTotal();
+  }
+
   /** Parse a generic node. */
   #parseNode(obj: any): any {
     if (obj === undefined || obj === null) {
@@ -359,48 +388,3 @@ export class SwaggerParser {
     return normalizedPath;
   }
 }
-
-// // FIXME: Move this?
-// /** Returns the error schemas discovered for this parser. */
-// #getErrorSchemas(): Map<string, OpenAPIV2.SchemaObject> {
-//   return this.errorSchemas;
-// }
-
-// // FIXME: Move this?
-// #reportUnresolvedReferences(): void {
-//   if (!this.defRegistry) {
-//     throw new Error("Definition registry is not initialized.");
-//   }
-//   const unresolvedReferences = this.defRegistry.getUnresolvedReferences();
-//   if (unresolvedReferences.length > 0) {
-//     console.warn(
-//       `== UNRESOLVED REFERENCES == (${unresolvedReferences.length})\n\n`
-//     );
-//     console.warn(`${unresolvedReferences.join("\n")}`);
-//   }
-// }
-
-// // FIXME: Move this?
-// #reportUnreferencedObjects(): void {
-//   if (!this.defRegistry) {
-//     throw new Error("Definition registry is not initialized.");
-//   }
-//   const unreferencedDefinitions = this.defRegistry.getUnreferenced();
-//   // We don't care about unused security definitions because we don't really
-//   // use them in Azure. (We will still diff them though)
-//   unreferencedDefinitions.delete(RegistryKind.SecurityDefinition);
-//   if (unreferencedDefinitions.size > 0) {
-//     let total = 0;
-//     for (const value of unreferencedDefinitions.values()) {
-//       total += value.length;
-//     }
-//     console.warn(`\n== UNREFERENCED DEFINITIONS == (${total})\n`);
-//   }
-//   for (const [key, value] of unreferencedDefinitions.entries()) {
-//     if (value.length > 0) {
-//       console.warn(
-//         `\n**${RegistryKind[key]}** (${value.length})\n\n${value.join("\n")}`
-//       );
-//     }
-//   }
-// }
