@@ -31,8 +31,10 @@ const swaggerPropertiesToIgnore = [
   "x-ms-parameter-location",
 ];
 
-export function ignoreSwaggerPropertiesRule(data: Diff<any, any>): RuleResult {
-  if (!data.path) return RuleResult.ContinueProcessing;
+export function ignoreSwaggerPropertiesRule(
+  data: Diff<any, any>
+): RuleResult | undefined {
+  if (!data.path) return;
   const fullPath = data.path.join(".");
   const lastPath = data.path.slice(-1)[0];
   if (swaggerPropertiesToIgnore.includes(lastPath)) {
@@ -43,5 +45,4 @@ export function ignoreSwaggerPropertiesRule(data: Diff<any, any>): RuleResult {
       return RuleResult.NoViolation;
     }
   }
-  return RuleResult.ContinueProcessing;
 }

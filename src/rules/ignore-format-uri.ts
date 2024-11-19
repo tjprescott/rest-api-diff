@@ -20,14 +20,14 @@ function getParameter(
 export function ignoreFormatUriRule(
   data: Diff<any, any>,
   lhs?: OpenAPIV2.Document,
-  rhs?: OpenAPIV2.Document
-): RuleResult {
-  if (!data.path) return RuleResult.ContinueProcessing;
-  if (data.kind !== "N") return RuleResult.ContinueProcessing;
+  _?: OpenAPIV2.Document
+): RuleResult | undefined {
+  if (!data.path) return;
+  if (data.kind !== "N") return;
   const path = data.path.join(".");
   const regex = /parameters\.(\d+)\.format/;
   const match = path.match(regex);
-  if (!match) return RuleResult.ContinueProcessing;
+  if (!match) return;
   const paramPath = data.path.slice(0, -1);
   const param = getParameter(lhs, paramPath);
   if (!param) {
@@ -37,5 +37,4 @@ export function ignoreFormatUriRule(
   if (skipUrlEncoding && skipUrlEncoding === true) {
     return RuleResult.NoViolation;
   }
-  return RuleResult.ContinueProcessing;
 }

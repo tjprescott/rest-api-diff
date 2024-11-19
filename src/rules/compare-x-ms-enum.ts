@@ -6,12 +6,12 @@ import { RuleResult } from "./rules.js";
  */
 export function compareXMsEnumRule(
   data: Diff<any, any>
-): RuleResult | [RuleResult, string] {
-  if (!data.path) return RuleResult.ContinueProcessing;
+): RuleResult | [RuleResult, string] | undefined {
+  if (!data.path) return;
   const path = data.path.join(".");
   const regex = /x-ms-enum\.(\w+)./;
   const match = path.match(regex);
-  if (!match) return RuleResult.ContinueProcessing;
+  if (!match) return;
   const property = match[1];
   if (property === "modelAsString") {
     const lhs = (data as any).lhs ?? "undefined";

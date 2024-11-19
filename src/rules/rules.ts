@@ -22,15 +22,13 @@ export enum RuleResult {
   AssumedViolation = "A",
   /** Rule applies and verifies this is not a violation. Stop processing other rules for this diff. */
   NoViolation = "N",
-  /** The rule doesn't apply, so continue processing rules. */
-  ContinueProcessing = "C",
 }
 
 export type RuleSignature = (
   data: Diff<any, any>,
   lhs?: OpenAPIV2.Document,
   rhs?: OpenAPIV2.Document
-) => RuleResult | [RuleResult, string];
+) => RuleResult | [RuleResult, string] | undefined;
 
 /** Returns the list of rules that should be applied, modified by any options. */
 export function getApplicableRules(args: any): RuleSignature[] {

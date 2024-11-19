@@ -15,7 +15,8 @@ export enum RegistryKind {
   SecurityDefinition,
 }
 
-export class CollectionRegistry {
+/** A registry containing a collection of related definitions. Used by DefinitionRegistry. */
+class CollectionRegistry {
   public kind: RegistryKind;
   /** Top-level key is path, inner key is name */
   public data = new Map<string, Map<string, any>>();
@@ -80,7 +81,7 @@ export class CollectionRegistry {
   }
 }
 
-/** A class which contains all defintions which can be referenced in a spec. */
+/** A class which contains all definitions which can be referenced in a spec. */
 export class DefinitionRegistry {
   private data: {
     definitions: CollectionRegistry;

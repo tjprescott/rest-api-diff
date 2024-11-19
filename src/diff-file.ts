@@ -1,12 +1,12 @@
 import * as fs from "fs";
-import { DiffDeleted, DiffEdit, DiffNew } from "deep-diff";
+import { Diff } from "deep-diff";
 import { RuleResult } from "./rules/rules.js";
 
 export interface DiffItem {
   ruleResult: RuleResult;
   ruleName?: string;
   message?: string;
-  diff: DiffNew<any> | DiffEdit<any, any> | DiffDeleted<any>;
+  diff: Diff<any, any>;
 }
 
 export interface DiffGroupingResult {

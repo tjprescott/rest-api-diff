@@ -58,11 +58,11 @@ export function compareErrorsRule(
   data: Diff<any, any>,
   lhs?: OpenAPIV2.Document,
   rhs?: OpenAPIV2.Document
-): RuleResult | [result: RuleResult, message: string] {
-  if (!data.path) return RuleResult.ContinueProcessing;
-  if (data.kind !== "E") return RuleResult.ContinueProcessing;
+): RuleResult | [result: RuleResult, message: string] | undefined {
+  if (!data.path) return;
+  if (data.kind !== "E") return;
   const lastPath = data.path[data.path.length - 1];
-  if (lastPath !== "$error") return RuleResult.ContinueProcessing;
+  if (lastPath !== "$error") return;
   const lhsError = (lhs?.definitions as any)?.[data.lhs];
   const rhsError = (rhs?.definitions as any)?.[data.rhs];
   const errors = reportIncompatibilities(lhsError, rhsError);

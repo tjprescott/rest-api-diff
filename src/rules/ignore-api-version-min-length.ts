@@ -21,12 +21,12 @@ export function ignoreApiVersionMinLengthRule(
   data: Diff<any, any>,
   lhs?: OpenAPIV2.Document,
   rhs?: OpenAPIV2.Document
-): RuleResult {
-  if (!data.path) return RuleResult.ContinueProcessing;
+): RuleResult | undefined {
+  if (!data.path) return;
   const path = data.path.join(".");
   const regex = /parameters\.(\d+)\.minLength/;
   const match = path.match(regex);
-  if (!match) return RuleResult.ContinueProcessing;
+  if (!match) return;
   const paramPath = data.path.slice(0, -1);
   const source = (data as any).lhs !== undefined ? lhs : rhs;
   const param = getParameter(source, paramPath);
@@ -34,5 +34,4 @@ export function ignoreApiVersionMinLengthRule(
     throw new Error(`Parameter not found at path: ${paramPath.join(".")}`);
   }
   if (param.name === "api-version") return RuleResult.NoViolation;
-  return RuleResult.ContinueProcessing;
 }

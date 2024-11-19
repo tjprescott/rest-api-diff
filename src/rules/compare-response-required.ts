@@ -6,11 +6,11 @@ import { RuleResult } from "./rules.js";
  */
 export function compareResponseRequiredRule(
   data: Diff<any, any>
-): RuleResult | [RuleResult, string] {
-  if (!data.path) return RuleResult.ContinueProcessing;
+): RuleResult | [RuleResult, string] | undefined {
+  if (!data.path) return;
   const path = data.path.join(".");
-  if (!path.endsWith("required")) return RuleResult.ContinueProcessing;
-  if (!path.includes("responses")) return RuleResult.ContinueProcessing;
+  if (!path.endsWith("required")) return;
+  if (!path.includes("responses")) return;
   if (data.kind === "N") {
     return RuleResult.NoViolation;
   }
@@ -18,5 +18,4 @@ export function compareResponseRequiredRule(
     const message = `Response property '${path}' is required in the LHS but not the RHS.`;
     return [RuleResult.FlaggedViolation, message];
   }
-  return RuleResult.ContinueProcessing;
 }
