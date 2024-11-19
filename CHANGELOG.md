@@ -1,8 +1,8 @@
 # @azure-tools/rest-api-diff
 
-## 0.1.6 (TBD)
+## 0.1.6 (2024-11-19)
 
-TBD
+- Fixed issue where flags did not work correctly when supplied on the command line.
 
 ## 0.1.5 (2024-11-08)
 
