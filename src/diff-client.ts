@@ -7,16 +7,11 @@ import {
   RuleSignature,
 } from "./rules/rules.js";
 import { forceArray, loadPaths } from "./util.js";
-import * as fs from "fs";
-import {
-  DiffItem,
-  writeFlatViolations,
-  writeGroupedViolations,
-} from "./diff-file.js";
 import { OpenAPIV2 } from "openapi-types";
 import { epilogue } from "./index.js";
 import assert from "assert";
 import { RegistryKind } from "./definitions.js";
+import * as fs from "fs";
 
 export interface DiffClientConfig {
   lhs: string | string[];
@@ -208,6 +203,8 @@ export class DiffClient {
         this.diffResults.noViolations
       ),
       inverse: this.#pruneDocuments(this.lhs, this.rhs, allViolations),
+      diff: this.#buildDiffFile(allViolations),
+      diffInverse: this.#buildDiffFile(this.diffResults.noViolations),
     };
   }
 
@@ -294,13 +291,8 @@ export class DiffClient {
     // write out the diff.json file based on the grouping preference
     const normalPath = `${outputFolder}/diff.json`;
     const inversePath = `${outputFolder}/diff-inv.json`;
-    if (groupViolations) {
-      writeGroupedViolations(allViolations, normalPath);
-      writeGroupedViolations(this.diffResults.noViolations, inversePath);
-    } else {
-      writeFlatViolations(allViolations, normalPath);
-      writeFlatViolations(this.diffResults.noViolations, inversePath);
-    }
+    fs.writeFileSync(normalPath, JSON.stringify(results.diff, null, 2));
+    fs.writeFileSync(inversePath, JSON.stringify(results.diffInverse, null, 2));
     // add up the length of each array
     const summary: ResultSummary = {
       flaggedViolations: this.diffResults.flaggedViolations.length,
@@ -491,6 +483,29 @@ export class DiffClient {
     }
   }
 
+  #buildDiffFile(diffs: DiffItem[]): any {
+    if (!this.args["group-violations"]) {
+      return diffs;
+    }
+    const defaultRule = "assumedViolation";
+    const groupedDiff: { [key: string]: DiffGroupingResult } = {};
+    for (const diff of diffs) {
+      const ruleName = diff.ruleName ?? defaultRule;
+      if (!groupedDiff[ruleName]) {
+        groupedDiff[ruleName] = {
+          name: ruleName,
+          count: 0,
+          items: [],
+        };
+      }
+      groupedDiff[ruleName]!.items.push(diff);
+      groupedDiff[ruleName]!.count++;
+    }
+    // Sort by count descending
+    const sorted = Object.values(groupedDiff).sort((a, b) => b.count - a.count);
+    return sorted;
+  }
+
   #reportUnreferencedObjects(parser: SwaggerParser): void {
     const unreferencedDefinitions = parser.getUnreferenced();
     // We don't care about unused security definitions because we don't really
@@ -513,6 +528,22 @@ export class DiffClient {
   }
 }
 
+/** Describes a diff item */
+export interface DiffItem {
+  ruleResult: RuleResult;
+  ruleName?: string;
+  message?: string;
+  diff: Diff<any, any>;
+}
+
+/** Describes a grouping of diff items. */
+export interface DiffGroupingResult {
+  name: string;
+  count: number;
+  items: DiffItem[];
+}
+
+/** Describes the sorted results of diffing. */
 interface DiffResult {
   flaggedViolations: DiffItem[];
   assumedViolations: DiffItem[];
@@ -523,6 +554,8 @@ interface ResultFiles {
   raw: [any, any];
   normal: [any, any];
   inverse: [any, any];
+  diff: any;
+  diffInverse: any;
 }
 
 interface ResultSummary {

@@ -1,8 +1,15 @@
 import * as crypto from "crypto";
 import { OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
-import { ParameterizedHost } from "./extensions/parameterized-host.js";
 import { forceArray, isReference, loadPaths, parseReference } from "./util.js";
+
+/** Parameterized Host Metadata */
+interface ParameterizedHost {
+  hostTemplate: string;
+  useSchemePrefix: boolean;
+  positionInOperation: "first" | "last";
+  parameters: any[];
+}
 
 /** A class for parsing Swagger files into an expanded, normalized form. */
 export class SwaggerParser {
