@@ -1,33 +1,26 @@
 import { fail } from "assert";
-import { it } from "vitest";
+import { expect, it } from "vitest";
 import { getApplicableRules } from "../src/rules/rules.js";
-import { DiffClient, DiffClientConfig } from "../src/diff-client.js";
-
-it("should compare the test file with the config file", async () => {
-  fail("Not implemented");
-});
-
-it("should group violations when --group-violations is set", async () => {
-  fail("Not implemented");
-});
-
-it("should write flat violations when --flat-violations is set", async () => {
-  fail("Not implemented");
-});
+import { DiffClientConfig } from "../src/diff-client.js";
+import { TestableDiffClient } from "./test-host.js";
 
 it("should compare two files", async () => {
-  const args = {
-    "group-violations": true,
-  };
   const config: DiffClientConfig = {
     lhs: ["test/files/test1a.json"],
     rhs: ["test/files/test1b.json"],
-    args: args,
-    rules: getApplicableRules(args),
+    args: {},
+    rules: getApplicableRules({}),
   };
-  const client = await DiffClient.create(config);
+  const client = await TestableDiffClient.create(config);
   client.parse();
   client.processDiff();
   client.buildOutput();
-  fail("Not implemented");
+  const [lhsParser, rhsParser] = client.getParsers();
+  expect(lhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(lhsParser.getUnreferencedTotal()).toBe(0);
+  expect(rhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(rhsParser.getUnreferencedTotal()).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.noViolations.length).toBe(4);
 });

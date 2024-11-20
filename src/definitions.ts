@@ -24,13 +24,13 @@ class CollectionRegistry {
 
   constructor(data: Map<string, any>, key: string, kind: RegistryKind) {
     this.kind = kind;
-    for (const [path, value] of data.entries()) {
+    // set all items as unreferenced initially
+    for (const [filepath, value] of data.entries()) {
       const subdata = (value as any)[key];
       if (subdata !== undefined) {
         for (const [name, _] of Object.entries(subdata).toSorted()) {
-          // replace backslashes with forward slashes
-          const normPath = path.replace(/\\/g, "/");
-          const pathKey = `${normPath}#/${this.getRegistryName()}/${name}`;
+          const resolvedPath = path.resolve(filepath).replace(/\\/g, "/");
+          const pathKey = `${resolvedPath}#/${this.getRegistryName()}/${name}`;
           this.unreferenced.add(pathKey);
         }
       }
@@ -52,13 +52,13 @@ class CollectionRegistry {
 
   /** Add or update an item. */
   add(itemPath: string, name: string, value: any) {
-    const normPath = path.normalize(itemPath);
-    if (!this.data.has(normPath)) {
-      this.data.set(normPath, new Map<string, any>());
+    const resolvedPath = path.resolve(itemPath);
+    if (!this.data.has(resolvedPath)) {
+      this.data.set(resolvedPath, new Map<string, any>());
     }
-    const innerMap = this.data.get(normPath)!;
+    const innerMap = this.data.get(resolvedPath)!;
     innerMap.set(name, value);
-    this.data.set(normPath, innerMap);
+    this.data.set(resolvedPath, innerMap);
   }
 
   /** Retrieve an item, if found. */

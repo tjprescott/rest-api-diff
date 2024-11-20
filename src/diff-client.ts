@@ -61,7 +61,7 @@ export class DiffClient {
     return client;
   }
 
-  private constructor(config: DiffClientConfig) {
+  protected constructor(config: DiffClientConfig) {
     this.args = config.args;
     this.rules = config.rules ?? getApplicableRules(config.args);
     const lhs = forceArray(config.lhs);
@@ -371,7 +371,8 @@ export class DiffClient {
       if (stat.isDirectory()) {
         defaultPath = paths[0];
       } else {
-        defaultPath = paths[0].split("/").slice(0, -1).join("/");
+        defaultPath = process.cwd();
+        //defaultPath = paths[0].split("/").slice(0, -1).join("/");
       }
     } else {
       defaultPath = process.cwd();
