@@ -111,10 +111,7 @@ export class DiffClient {
     this.shortenKeys();
     const lhs = this.lhs;
     const rhs = this.rhs;
-    const diffs = diff(lhs, rhs);
-    if (!diffs) {
-      throw new Error(`Error occurred while processing diffs.\n\n${epilogue}`);
-    }
+    const diffs = diff(lhs, rhs) ?? [];
 
     const results: DiffResult = {
       flaggedViolations: [],
@@ -501,9 +498,15 @@ export class DiffClient {
       groupedDiff[ruleName]!.items.push(diff);
       groupedDiff[ruleName]!.count++;
     }
+    const finalResults = new Map<string, any>();
     // Sort by count descending
     const sorted = Object.values(groupedDiff).sort((a, b) => b.count - a.count);
-    return sorted;
+    for (const item of sorted) {
+      const name = item.name!;
+      delete item.name;
+      finalResults.set(name, item);
+    }
+    return finalResults;
   }
 
   #reportUnreferencedObjects(parser: SwaggerParser): void {
@@ -538,7 +541,7 @@ export interface DiffItem {
 
 /** Describes a grouping of diff items. */
 export interface DiffGroupingResult {
-  name: string;
+  name?: string;
   count: number;
   items: DiffItem[];
 }

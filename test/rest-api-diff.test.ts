@@ -1,9 +1,7 @@
-import { fail } from "assert";
 import { expect, it } from "vitest";
 import { getApplicableRules } from "../src/rules/rules.js";
 import { DiffClientConfig } from "../src/diff-client.js";
 import { TestableDiffClient } from "./test-host.js";
-import exp from "constants";
 
 it("config should group violations when --group-violations is set", async () => {
   const args = { "group-violations": true };
@@ -18,10 +16,12 @@ it("config should group violations when --group-violations is set", async () => 
   client.processDiff();
   client.buildOutput();
   const diffInvFile = client.resultFiles?.diffInverse;
-  expect((diffInvFile as Array<any>).length).toBe(1);
-  const diffInvItem = diffInvFile[0];
+  expect((diffInvFile as Map<string, any>).size).toBe(1);
+  const key = [...(diffInvFile as Map<string, any>).keys()][0];
+  const diffInvItem = diffInvFile.get(key);
+  // ensure name is erased, since it is the map key
+  expect((diffInvItem as any).name).toBe(undefined);
   expect(diffInvItem.items.length).toBe(4);
-  expect(diffInvItem.name).toBe("ignoreSwaggerPropertiesRule");
 });
 
 it("config should not group violations when --group-violations is not set", async () => {
@@ -61,4 +61,55 @@ it("should compare two files", async () => {
   expect(client.diffResults?.assumedViolations.length).toBe(0);
   expect(client.diffResults?.flaggedViolations.length).toBe(0);
   expect(client.diffResults?.noViolations.length).toBe(4);
+});
+
+it("should compare two Swagger folders", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/swaggerMulti"],
+    rhs: ["test/files/swaggerCombined"],
+    args: {},
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  const [lhs, rhs] = client.resultFiles!.raw;
+  expect(rhs).toStrictEqual(lhs);
+});
+
+it("should compare a Swagger folder and a TypeSpec folder", async () => {
+  const args = {
+    "compile-tsp": true,
+  };
+  const config: DiffClientConfig = {
+    lhs: ["test/files/swaggerMulti"],
+    rhs: ["test/files/typespecMulti"],
+    args: args,
+    rules: getApplicableRules(args),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  const [lhs, rhs] = client.resultFiles!.normal;
+  expect(rhs).toStrictEqual(lhs);
+});
+
+it("should resolve external swagger references", async () => {
+  const args = {
+    "compile-tsp": true,
+  };
+  const config: DiffClientConfig = {
+    lhs: ["test/files/swaggerExternalReferences"],
+    rhs: ["test/files/swaggerMulti"],
+    args: args,
+    rules: getApplicableRules(args),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  const [lhs, rhs] = client.resultFiles!.raw;
+  expect(rhs).toStrictEqual(lhs);
 });

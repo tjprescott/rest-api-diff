@@ -159,12 +159,12 @@ export async function loadPaths(
 }
 
 /** Expands all local references into fully-qualified ones. */
-function normalizeReferences(path: string, content: string): string {
+function normalizeReferences(filepath: string, content: string): string {
   // ensure backslashes are replaced with forward slashes
-  path = path.replace(/\\/g, "/");
+  filepath = path.resolve(filepath).replace(/\\/g, "/");
   const regex = /"\$ref": ("#\/\w+\/[\w\.]+")/gm;
   const updated = content.replace(regex, (_, p1) => {
-    const newRef = `"${path}${p1.slice(1)}`;
+    const newRef = `"${filepath}${p1.slice(1)}`;
     return `"$ref": ${newRef}`;
   });
   return updated;
