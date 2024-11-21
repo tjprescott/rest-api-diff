@@ -132,6 +132,12 @@ export class SwaggerParser {
     for (const [path, data] of allSortedPaths) {
       this.result.paths[path] = data;
     }
+    // sort all of the top-level keys
+    const sortedResult: any = {};
+    for (const [key, val] of Object.entries(this.result).toSorted()) {
+      sortedResult[key] = val;
+    }
+    this.result = sortedResult;
     return this;
   }
 

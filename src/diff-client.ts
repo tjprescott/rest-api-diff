@@ -6,9 +6,8 @@ import {
   RuleResult,
   RuleSignature,
 } from "./rules/rules.js";
-import { forceArray, loadPaths } from "./util.js";
+import { forceArray } from "./util.js";
 import { OpenAPIV2 } from "openapi-types";
-import { epilogue } from "./index.js";
 import assert from "assert";
 import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";

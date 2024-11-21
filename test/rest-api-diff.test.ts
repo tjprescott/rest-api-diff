@@ -94,7 +94,7 @@ it("should compare a Swagger folder and a TypeSpec folder", async () => {
   client.buildOutput();
   const [lhs, rhs] = client.resultFiles!.normal;
   expect(rhs).toStrictEqual(lhs);
-});
+}, 30000); // longer timeout necessary to compile TypeSpec
 
 it("should resolve external swagger references", async () => {
   const args = {

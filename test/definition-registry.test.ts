@@ -113,7 +113,7 @@ it("has simple values as item keys when loading a folder", async () => {
   expect(firstVal.has("Foo")).toBe(true);
 });
 
-it("will resolve external references", async () => {
+it("should resolve external references", async () => {
   const args = {
     "compile-tsp": true,
   };
