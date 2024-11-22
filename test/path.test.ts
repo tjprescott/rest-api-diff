@@ -3,6 +3,7 @@ import { TestableDiffClient } from "./test-host.js";
 import { getApplicableRules } from "../src/rules/rules.js";
 import { DiffClientConfig } from "../src/index.js";
 import { fail } from "assert";
+import { loadPaths } from "../src/util.js";
 
 function assertSorted(array: Array<string>) {
   const sorted = array.toSorted();
@@ -34,10 +35,44 @@ it("sorts paths lexically", async () => {
   assertSorted(rhsPaths);
 });
 
-it.skip("expands parameterized host", async () => {
-  fail("not implemented");
+it("expands parameterized host", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/testParameterizedHost.json"],
+    rhs: ["test/files/testParameterizedHost.json"],
+    args: {},
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  const lhsKeys = Object.keys(client.lhs!);
+
+  // ensure that sorting doesn't change the order of the keys
+  assertSorted(lhsKeys);
+
+  // compare lhs and rhs paths and ensure they are sorted lexically
+  const lhsPaths = Object.keys(client.lhs!.paths);
+  expect(lhsPaths.length).toBe(1);
+  let path = lhsPaths[0];
+  expect(path).toBe("{endpoint}/foo/bar");
+  assertSorted(lhsPaths);
 });
 
-it.skip("expands x-ms-paths", async () => {
-  fail("not implemented");
+it("expands x-ms-paths", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/testXMsPaths.json"],
+    rhs: ["test/files/testXMsPaths.json"],
+    args: {},
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  const lhsKeys = Object.keys(client.lhs!);
+
+  // ensure that sorting doesn't change the order of the keys
+  assertSorted(lhsKeys);
+
+  // compare lhs and rhs paths and ensure they are sorted lexically
+  const lhsPaths = Object.keys(client.lhs!.paths);
+  expect(lhsPaths.length).toBe(2);
+  assertSorted(lhsPaths);
 });

@@ -360,7 +360,6 @@ export class DiffClient {
         defaultPath = paths[0];
       } else {
         defaultPath = process.cwd();
-        //defaultPath = paths[0].split("/").slice(0, -1).join("/");
       }
     } else {
       defaultPath = process.cwd();

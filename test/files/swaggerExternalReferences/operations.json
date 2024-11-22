@@ -13,6 +13,25 @@
   "produces": ["application/json"],
   "consumes": ["application/json"],
   "tags": [],
+  "definitions": {
+    "Bar": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "age": {
+          "type": "integer",
+          "format": "int16"
+        },
+        "weight": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": ["name", "age", "weight"]
+    }
+  },
   "paths": {
     "/": {
       "get": {
@@ -22,7 +41,7 @@
           "200": {
             "description": "The request has succeeded.",
             "schema": {
-              "$ref": "../common/common.json#/definitions/Foo"
+              "$ref": "./models.json#/definitions/Foo"
             }
           }
         }
@@ -49,7 +68,7 @@
           "200": {
             "description": "The request has succeeded.",
             "schema": {
-              "$ref": "../common/common.json#/definitions/Foo"
+              "$ref": "#/definitions/Bar"
             }
           }
         }

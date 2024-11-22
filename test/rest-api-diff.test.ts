@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { getApplicableRules } from "../src/rules/rules.js";
 import { DiffClientConfig } from "../src/diff-client.js";
 import { TestableDiffClient } from "./test-host.js";
+import { loadPaths } from "../src/util.js";
 
 it("config should group violations when --group-violations is set", async () => {
   const args = { "group-violations": true };
@@ -97,9 +98,20 @@ it("should compare a Swagger folder and a TypeSpec folder", async () => {
 }, 30000); // longer timeout necessary to compile TypeSpec
 
 it("should resolve external swagger references", async () => {
-  const args = {
-    "compile-tsp": true,
-  };
+  const paths = await loadPaths(["test/files/swaggerExternalReferences"], {});
+  const pathKeys = [...paths.keys()].toSorted();
+  const cwd = process.cwd();
+  const expected = [
+    `${cwd}\\test\\files\\common\\common.json`,
+    `${cwd}\\test\\files\\swaggerExternalReferences\\models.json`,
+    `${cwd}\\test\\files\\swaggerExternalReferences\\operations.json`,
+  ].toSorted();
+  expect(paths.size).toBe(3);
+  expect(pathKeys).toStrictEqual(expected);
+});
+
+it("should compare folders with external references", async () => {
+  const args = {};
   const config: DiffClientConfig = {
     lhs: ["test/files/swaggerExternalReferences"],
     rhs: ["test/files/swaggerMulti"],
@@ -110,6 +122,6 @@ it("should resolve external swagger references", async () => {
   client.parse();
   client.processDiff();
   client.buildOutput();
-  const [lhs, rhs] = client.resultFiles!.raw;
+  const [lhs, rhs] = client.resultFiles!.normal;
   expect(rhs).toStrictEqual(lhs);
 });

@@ -5,6 +5,11 @@ import { TestableDiffClient } from "./test-host.js";
 import { DefinitionRegistry, RegistryKind } from "../src/definitions.js";
 import { SwaggerParser } from "../src/parser.js";
 import { fail } from "assert";
+import {
+  extractFileReferences,
+  loadPaths,
+  loadSwaggerFile,
+} from "../src/util.js";
 
 function getDefinitionRegistry(parser: SwaggerParser): DefinitionRegistry {
   return (parser as any).defRegistry as DefinitionRegistry;
@@ -114,20 +119,16 @@ it("has simple values as item keys when loading a folder", async () => {
 });
 
 it("should resolve external references", async () => {
-  const args = {
-    "compile-tsp": true,
-  };
-  const config: DiffClientConfig = {
-    lhs: ["test/files/swaggerExternalReferences"],
-    rhs: ["test/files/swaggerMulti"],
-    args: args,
-    rules: getApplicableRules(args),
-  };
-  const client = await TestableDiffClient.create(config);
-  client.parse();
-  const [parser, _] = client.getParsers();
-  const lhsDefs = getDefinitionRegistry(parser).getCollection(
-    RegistryKind.Definition
+  const cwd = process.cwd();
+  const swaggerContents = await loadSwaggerFile(
+    "test/files/swaggerExternalReferences/operations.json"
   );
-  fail("Not implemented");
+  const root = `${cwd}\\test\\files\\swaggerExternalReferences`;
+  const references = extractFileReferences(swaggerContents, root);
+  const expected = [
+    `${cwd}\\test\\files\\common\\common.json`,
+    `${cwd}\\test\\files\\swaggerExternalReferences\\models.json`,
+    `${cwd}\\test\\files\\swaggerExternalReferences\\operations.json`,
+  ].toSorted();
+  expect(references.toSorted()).toStrictEqual(expected);
 });

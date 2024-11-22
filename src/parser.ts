@@ -43,7 +43,6 @@ export class SwaggerParser {
     const pathMap = await loadPaths(forceArray(paths), args);
     parser.defRegistry = new DefinitionRegistry(pathMap, rootPath, args);
     parser.swaggerMap = pathMap;
-    await parser.defRegistry.updateDiscoveredReferences();
     return parser;
   }
 

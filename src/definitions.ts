@@ -1,7 +1,7 @@
 import { OpenAPIV2 } from "openapi-types";
 import {
   isReference,
-  loadPaths,
+  getResolvedPath,
   parseReference,
   ReferenceMetadata,
 } from "./util.js";
@@ -29,7 +29,7 @@ class CollectionRegistry {
       const subdata = (value as any)[key];
       if (subdata !== undefined) {
         for (const [name, _] of Object.entries(subdata).toSorted()) {
-          const resolvedPath = path.resolve(filepath).replace(/\\/g, "/");
+          const resolvedPath = getResolvedPath(filepath).replace(/\\/g, "/");
           const pathKey = `${resolvedPath}#/${this.getRegistryName()}/${name}`;
           this.unreferenced.add(pathKey);
         }
@@ -52,7 +52,7 @@ class CollectionRegistry {
 
   /** Add or update an item. */
   add(itemPath: string, name: string, value: any) {
-    const resolvedPath = path.resolve(itemPath);
+    const resolvedPath = getResolvedPath(itemPath);
     if (!this.data.has(resolvedPath)) {
       this.data.set(resolvedPath, new Map<string, any>());
     }
@@ -93,7 +93,6 @@ export class DefinitionRegistry {
   private polymorphicMap = new Map<string, Set<string>>();
   private unresolvedReferences = new Set<string>();
   private providedPaths = new Set<string>();
-  private externalReferences = new Set<string>();
   private referenceStack: string[] = [];
   private referenceMap = new Map<string, Set<string>>();
   private rootPath: string;
@@ -134,29 +133,7 @@ export class DefinitionRegistry {
     this.currentPath;
     this.#gatherDefinitions(map);
     this.args = args;
-  }
-
-  async updateDiscoveredReferences() {
-    await this.#loadExternalReferences();
-    // reset the unresolved references now that the external references have been loaded
-    this.unresolvedReferences = new Set<string>();
     this.#expandReferences();
-  }
-
-  /** Checks if fullPath starts with the rootPath and adds it to
-   * external references if it does not.
-   */
-  #addIfExternal(fullPath: string | undefined) {
-    if (!fullPath) {
-      return;
-    }
-    const fullPathNorm = path.normalize(fullPath);
-    if (
-      !this.providedPaths.has(fullPathNorm) &&
-      !this.externalReferences.has(fullPathNorm)
-    ) {
-      this.externalReferences.add(fullPathNorm);
-    }
   }
 
   #expandObject(item: any): any {
@@ -168,7 +145,6 @@ export class DefinitionRegistry {
       if (!refResult) {
         return item;
       }
-      this.#addIfExternal(refResult.fullPath);
       let match = this.get(refResult);
       if (match) {
         if (this.referenceStack.includes(refResult.name)) {
@@ -340,7 +316,7 @@ export class DefinitionRegistry {
       }
     }
     // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
-    for (const [path, values] of collection.data.entries()) {
+    for (const [_, values] of collection.data.entries()) {
       for (const [_, value] of values) {
         this.#expandDerivedClasses(value);
       }
@@ -373,8 +349,6 @@ export class DefinitionRegistry {
       if (!refResult) {
         throw new Error(`Could not parse reference: ${ref}`);
       }
-      // record external references so those files can be discovered and loaded later
-      this.#addIfExternal(refResult.fullPath);
       allOf[0].$ref = refResult.expandedRef;
       const set = this.polymorphicMap.get(refResult.expandedRef);
       let pathKey = `${filePath}#/${this.getRegistryName(refResult.registry)}/${key}`;
@@ -454,14 +428,6 @@ export class DefinitionRegistry {
       }
       baseClass["$derivedClasses"] = Array.from(set);
     }
-  }
-
-  async #loadExternalReferences() {
-    const externalReferencesMap = await loadPaths(
-      [...this.externalReferences],
-      this.args
-    );
-    this.#gatherDefinitions(externalReferencesMap);
   }
 
   /** Get a collection. */

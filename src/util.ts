@@ -2,6 +2,7 @@ import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";
 import { exec } from "child_process";
 import path from "path";
+import { off } from "process";
 
 const typespecOutputDir = `${process.cwd()}/tsp-output`;
 
@@ -53,8 +54,8 @@ export function parseReference(
         `Relative path ${relPath} cannot be resolved without rootPath.`
       );
     }
-    fullPath = path.normalize(path.resolve(rootPath, relPath));
-    expandedRef = path.resolve(rootPath, originalRef);
+    fullPath = path.normalize(getResolvedPath(relPath, rootPath));
+    expandedRef = getResolvedPath(originalRef, rootPath);
   } else {
     if (filePath === undefined) {
       throw new Error(`Path ${relPath} cannot be resolved without filePath.`);
@@ -143,6 +144,7 @@ export async function loadPaths(
   args: any
 ): Promise<Map<string, any>> {
   let jsonContents = new Map<string, any>();
+  const refs = new Set<string>();
   for (const path of paths) {
     if (!validatePath(path)) {
       throw new Error(`Invalid path ${path}`);
@@ -152,6 +154,24 @@ export async function loadPaths(
       ? await loadFolderContents(path, args)
       : await loadFile(path, args);
     for (const [key, value] of values.entries()) {
+      const fileRefs = extractFileReferences(value, path);
+      for (const ref of fileRefs) {
+        refs.add(ref);
+      }
+      const resolvedKey = getResolvedPath(key);
+      jsonContents.set(resolvedKey, value);
+    }
+  }
+  // remove all the paths that were already loaded
+  const resolvedKeys = [...jsonContents.keys()].map((key) =>
+    getResolvedPath(key)
+  );
+  const externalPathsToLoad = [...refs].filter(
+    (key) => !resolvedKeys.includes(key)
+  );
+  if (externalPathsToLoad.length > 0) {
+    const additionalContents = await loadPaths(externalPathsToLoad, args);
+    for (const [key, value] of additionalContents.entries()) {
       jsonContents.set(key, value);
     }
   }
@@ -161,7 +181,7 @@ export async function loadPaths(
 /** Expands all local references into fully-qualified ones. */
 function normalizeReferences(filepath: string, content: string): string {
   // ensure backslashes are replaced with forward slashes
-  filepath = path.resolve(filepath).replace(/\\/g, "/");
+  filepath = getResolvedPath(filepath).replace(/\\/g, "/");
   const regex = /"\$ref": ("#\/\w+\/[\w\.]+")/gm;
   const updated = content.replace(regex, (_, p1) => {
     const newRef = `"${filepath}${p1.slice(1)}`;
@@ -173,8 +193,13 @@ function normalizeReferences(filepath: string, content: string): string {
 /**
  * Loads Swagger files. If the file is not a Swagger file, it will return undefined.
  */
-async function loadSwaggerFile(path: string): Promise<any | undefined> {
-  const fileContent = normalizeReferences(path, fs.readFileSync(path, "utf-8"));
+export async function loadSwaggerFile(
+  sourcePath: string
+): Promise<any | undefined> {
+  const fileContent = normalizeReferences(
+    sourcePath,
+    fs.readFileSync(sourcePath, "utf-8")
+  );
   try {
     const jsonContent = JSON.parse(fileContent);
     if (!jsonContent.swagger) {
@@ -186,6 +211,28 @@ async function loadSwaggerFile(path: string): Promise<any | undefined> {
     // ignore non-JSON files
     return undefined;
   }
+}
+
+/**
+ * Extracts from the referenced file any file references from $ref
+ * usages. Returns an array of file paths that are referenced.
+ * @param data The JSON data to search for references.
+ * @param rootPath The root path to use when resolving relative paths.
+ * @returns An array of file paths that are referenced.
+ */
+export function extractFileReferences(data: any, rootPath: string): string[] {
+  const fileContent = JSON.stringify(data);
+  const regex = /"\$ref":\s*"(.*?)#(.*?)"/g;
+  const refMatches = [...fileContent.matchAll(regex)];
+  const resultSet = new Set<string>();
+  for (const match of refMatches) {
+    let matchPath = match[1];
+    if (matchPath !== "") {
+      const resolvedMatch = getResolvedPath(matchPath, rootPath);
+      resultSet.add(resolvedMatch);
+    }
+  }
+  return [...resultSet];
 }
 
 async function loadFolder(path: string): Promise<Map<string, any> | undefined> {
@@ -210,7 +257,7 @@ async function loadFolder(path: string): Promise<Map<string, any> | undefined> {
 }
 
 function validatePath(value: string): boolean {
-  const resolvedPath = path.resolve(value);
+  const resolvedPath = getResolvedPath(value);
   const stats = fs.statSync(resolvedPath);
   return stats.isFile() || stats.isDirectory();
 }
@@ -271,4 +318,17 @@ async function compileTypespec(
 /** Converts a single value or array to an array. */
 export function forceArray<T>(value: T | T[]): T[] {
   return Array.isArray(value) ? value : [value];
+}
+
+/**
+ * Turn a relative path into a fully-qualified resolved path.
+ * If the path is relative, the root path must be provided.
+ */
+export function getResolvedPath(targetPath: string, rootPath?: string): string {
+  if (targetPath.startsWith(".") && !rootPath) {
+    throw new Error("Root path must be provided to resolve relative paths.");
+  }
+  return rootPath
+    ? path.resolve(rootPath, targetPath)
+    : path.resolve(targetPath);
 }
