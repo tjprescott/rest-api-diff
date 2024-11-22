@@ -1,0 +1,22 @@
+{
+  "swagger": "2.0",
+  "definitions": {
+    "Foo": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "age": {
+          "type": "integer",
+          "format": "int16"
+        },
+        "weight": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": ["name", "age", "weight"]
+    }
+  }
+}

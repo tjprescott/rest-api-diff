@@ -1,6 +1,6 @@
 # @azure-tools/rest-api-diff
 
-## 0.1.7 (TBD)
+## 0.1.7 (2024-11-22)
 
 - Fixed issue where paths were being sorted correctly, leading to unreadable visual diffs.
 

@@ -1,29 +1,33 @@
 {
   "name": "@azure-tools/rest-api-diff",
-  "version": "0.1.6",
+  "version": "0.1.7",
+  "author": "Microsoft Corporation",
   "description": "Compares two Swagger definitions to identify relevant differences.",
-  "main": "dist/index.js",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "node scripts/inject-version.mjs && npm run clean && npm run build:tsc",
     "build:tsc": "tsc",
     "clean": "rimraf ./dist ./temp ./types",
     "prepack": "npm run build",
     "purge": "rimraf .node_modules package-lock.json",
-    "test": "vitest run",
+    "test": "vitest",
     "rest-api-diff": "node cmd/rest-api-diff.js",
     "watch": "tsc -p . --watch"
-  },
-  "author": "Microsoft Corporation",
-  "license": "MIT",
-  "type": "module",
-  "engines": {
-    "node": ">=18.0.0"
   },
   "bin": {
     "rest-api-diff": "cmd/rest-api-diff.js"
   },
   "files": [
-    "dist",
+    "dist/**",
+    "!dist/test/**",
     "cmd/rest-api-diff.js"
   ],
   "devDependencies": {

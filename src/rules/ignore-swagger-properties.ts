@@ -19,6 +19,7 @@ const swaggerPropertiesToIgnore = [
   "operationId",
   "summary",
   "tags",
+  "title",
   // Extensions that are intended for consumption by Autorest and thus
   // don't impact the REST API shape.
   "x-ms-client-default",

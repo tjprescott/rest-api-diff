@@ -1,9 +1,10 @@
 import { OpenAPIV2 } from "openapi-types";
 import {
   isReference,
-  loadPaths,
+  getResolvedPath,
   parseReference,
   ReferenceMetadata,
+  toSorted,
 } from "./util.js";
 import path from "path";
 
@@ -24,13 +25,13 @@ class CollectionRegistry {
 
   constructor(data: Map<string, any>, key: string, kind: RegistryKind) {
     this.kind = kind;
-    for (const [path, value] of data.entries()) {
+    // set all items as unreferenced initially
+    for (const [filepath, value] of data.entries()) {
       const subdata = (value as any)[key];
       if (subdata !== undefined) {
-        for (const [name, _] of Object.entries(subdata).toSorted()) {
-          // replace backslashes with forward slashes
-          const normPath = path.replace(/\\/g, "/");
-          const pathKey = `${normPath}#/${this.getRegistryName()}/${name}`;
+        for (const [name, _] of toSorted(Object.entries(subdata))) {
+          const resolvedPath = getResolvedPath(filepath).replace(/\\/g, "/");
+          const pathKey = `${resolvedPath}#/${this.getRegistryName()}/${name}`;
           this.unreferenced.add(pathKey);
         }
       }
@@ -52,13 +53,13 @@ class CollectionRegistry {
 
   /** Add or update an item. */
   add(itemPath: string, name: string, value: any) {
-    const normPath = path.normalize(itemPath);
-    if (!this.data.has(normPath)) {
-      this.data.set(normPath, new Map<string, any>());
+    const resolvedPath = getResolvedPath(itemPath);
+    if (!this.data.has(resolvedPath)) {
+      this.data.set(resolvedPath, new Map<string, any>());
     }
-    const innerMap = this.data.get(normPath)!;
+    const innerMap = this.data.get(resolvedPath)!;
     innerMap.set(name, value);
-    this.data.set(normPath, innerMap);
+    this.data.set(resolvedPath, innerMap);
   }
 
   /** Retrieve an item, if found. */
@@ -93,7 +94,6 @@ export class DefinitionRegistry {
   private polymorphicMap = new Map<string, Set<string>>();
   private unresolvedReferences = new Set<string>();
   private providedPaths = new Set<string>();
-  private externalReferences = new Set<string>();
   private referenceStack: string[] = [];
   private referenceMap = new Map<string, Set<string>>();
   private rootPath: string;
@@ -134,29 +134,7 @@ export class DefinitionRegistry {
     this.currentPath;
     this.#gatherDefinitions(map);
     this.args = args;
-  }
-
-  async updateDiscoveredReferences() {
-    await this.#loadExternalReferences();
-    // reset the unresolved references now that the external references have been loaded
-    this.unresolvedReferences = new Set<string>();
     this.#expandReferences();
-  }
-
-  /** Checks if fullPath starts with the rootPath and adds it to
-   * external references if it does not.
-   */
-  #addIfExternal(fullPath: string | undefined) {
-    if (!fullPath) {
-      return;
-    }
-    const fullPathNorm = path.normalize(fullPath);
-    if (
-      !this.providedPaths.has(fullPathNorm) &&
-      !this.externalReferences.has(fullPathNorm)
-    ) {
-      this.externalReferences.add(fullPathNorm);
-    }
   }
 
   #expandObject(item: any): any {
@@ -168,7 +146,6 @@ export class DefinitionRegistry {
       if (!refResult) {
         return item;
       }
-      this.#addIfExternal(refResult.fullPath);
       let match = this.get(refResult);
       if (match) {
         if (this.referenceStack.includes(refResult.name)) {
@@ -178,7 +155,7 @@ export class DefinitionRegistry {
         } else {
           let matchCopy = JSON.parse(JSON.stringify(match));
           // spread in any overriding properties
-          for (const [key, value] of Object.entries(itemCopy).toSorted()) {
+          for (const [key, value] of toSorted(Object.entries(itemCopy))) {
             matchCopy[key] = value;
           }
           return this.#expand(matchCopy, refResult.name);
@@ -193,7 +170,7 @@ export class DefinitionRegistry {
       const expanded: any = {};
       this.#expandDerivedClasses(item);
       this.#expandAllOf(item);
-      for (const [propName, propValue] of Object.entries(item).toSorted()) {
+      for (const [propName, propValue] of toSorted(Object.entries(item))) {
         expanded[propName] = this.#expand(propValue);
       }
       return expanded;
@@ -340,7 +317,7 @@ export class DefinitionRegistry {
       }
     }
     // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
-    for (const [path, values] of collection.data.entries()) {
+    for (const [_, values] of collection.data.entries()) {
       for (const [_, value] of values) {
         this.#expandDerivedClasses(value);
       }
@@ -373,8 +350,6 @@ export class DefinitionRegistry {
       if (!refResult) {
         throw new Error(`Could not parse reference: ${ref}`);
       }
-      // record external references so those files can be discovered and loaded later
-      this.#addIfExternal(refResult.fullPath);
       allOf[0].$ref = refResult.expandedRef;
       const set = this.polymorphicMap.get(refResult.expandedRef);
       let pathKey = `${filePath}#/${this.getRegistryName(refResult.registry)}/${key}`;
@@ -416,27 +391,27 @@ export class DefinitionRegistry {
 
   #gatherDefinitions(map: Map<string, any>) {
     for (const [path, fileData] of map.entries()) {
-      for (const [name, data] of Object.entries(
-        fileData.definitions ?? {}
-      ).toSorted()) {
+      for (const [name, data] of toSorted(
+        Object.entries(fileData.definitions ?? {})
+      )) {
         this.#visitDefinition(path, name, data);
       }
 
-      for (const [name, data] of Object.entries(
-        fileData.parameters ?? {}
-      ).toSorted()) {
+      for (const [name, data] of toSorted(
+        Object.entries(fileData.parameters ?? {})
+      )) {
         this.#visitParameter(path, name, data);
       }
 
-      for (const [name, data] of Object.entries(
-        fileData.responses ?? {}
-      ).toSorted()) {
+      for (const [name, data] of toSorted(
+        Object.entries(fileData.responses ?? {})
+      )) {
         this.#visitResponse(path, name, data);
       }
 
-      for (const [name, data] of Object.entries(
-        fileData.securityDefinitions ?? {}
-      ).toSorted()) {
+      for (const [name, data] of toSorted(
+        Object.entries(fileData.securityDefinitions ?? {})
+      )) {
         this.data.securityDefinitions.add(path, name, data);
       }
     }
@@ -454,14 +429,6 @@ export class DefinitionRegistry {
       }
       baseClass["$derivedClasses"] = Array.from(set);
     }
-  }
-
-  async #loadExternalReferences() {
-    const externalReferencesMap = await loadPaths(
-      [...this.externalReferences],
-      this.args
-    );
-    this.#gatherDefinitions(externalReferencesMap);
   }
 
   /** Get a collection. */
