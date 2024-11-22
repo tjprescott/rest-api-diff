@@ -1,7 +1,13 @@
 import * as crypto from "crypto";
 import { OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
-import { forceArray, isReference, loadPaths, parseReference } from "./util.js";
+import {
+  forceArray,
+  isReference,
+  loadPaths,
+  parseReference,
+  toSorted,
+} from "./util.js";
 
 /** Parameterized Host Metadata */
 interface ParameterizedHost {
@@ -78,7 +84,7 @@ export class SwaggerParser {
         allPathsUnsorted[path] = data;
       }
 
-      for (const [key, val] of Object.entries(data).toSorted()) {
+      for (const [key, val] of toSorted(Object.entries(data))) {
         switch (key) {
           case "swagger":
           case "info":
@@ -133,7 +139,7 @@ export class SwaggerParser {
     }
     // sort all of the top-level keys
     const sortedResult: any = {};
-    for (const [key, val] of Object.entries(this.result).toSorted()) {
+    for (const [key, val] of toSorted(Object.entries(this.result))) {
       sortedResult[key] = val;
     }
     this.result = sortedResult;
@@ -192,12 +198,12 @@ export class SwaggerParser {
   /** Parse a response object. */
   #parseResponse(value: any): any {
     let result: any = {};
-    for (const [key, val] of Object.entries(value).toSorted()) {
+    for (const [key, val] of toSorted(Object.entries(value))) {
       if (key === "headers") {
         result[key] = {};
-        for (const [headerKey, headerVal] of Object.entries(
-          val as object
-        ).toSorted()) {
+        for (const [headerKey, headerVal] of toSorted(
+          Object.entries(val as object)
+        )) {
           // normalize header keys to lowercase
           result[key][headerKey.toLowerCase()] = this.#parseNode(headerVal);
         }
@@ -236,7 +242,7 @@ export class SwaggerParser {
   /** Parse the operation responses object. */
   #parseResponses(value: any): any {
     let result: any = {};
-    for (const [code, data] of Object.entries(value).toSorted()) {
+    for (const [code, data] of toSorted(Object.entries(value))) {
       if (code === "default") {
         // Don't expand the default response. We will handle this in a special way.
         const errorName = this.#parseErrorName(data);
@@ -260,7 +266,7 @@ export class SwaggerParser {
     let result: any = {};
     value["consumes"] = value["consumes"] ?? this.defaultConsumes;
     value["produces"] = value["produces"] ?? this.defaultProduces;
-    for (const [key, val] of Object.entries(value).toSorted()) {
+    for (const [key, val] of toSorted(Object.entries(value))) {
       if (key === "parameters") {
         // mix in any parameters from parameterized host
         const hostParams = this.parameterizedHost?.parameters ?? [];
@@ -301,7 +307,7 @@ export class SwaggerParser {
   /** Parse each verb/operation pair. */
   #parseVerbs(value: any): any {
     let result: any = {};
-    for (const [verb, data] of Object.entries(value).toSorted()) {
+    for (const [verb, data] of toSorted(Object.entries(value))) {
       result[verb] = this.#parseOperation(data);
     }
     return result;
@@ -374,7 +380,7 @@ export class SwaggerParser {
     }
     const result: any = {};
     // visit each key in the object in sorted order
-    for (const [key, val] of Object.entries(value).toSorted()) {
+    for (const [key, val] of toSorted(Object.entries(value))) {
       result[key] = this.#parseNode(val);
     }
     return result;

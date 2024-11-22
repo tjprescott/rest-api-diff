@@ -2,11 +2,10 @@ import { expect, it } from "vitest";
 import { TestableDiffClient } from "./test-host.js";
 import { getApplicableRules } from "../src/rules/rules.js";
 import { DiffClientConfig } from "../src/index.js";
-import { fail } from "assert";
-import { loadPaths } from "../src/util.js";
+import { toSorted } from "../src/util.js";
 
 function assertSorted(array: Array<string>) {
-  const sorted = array.toSorted();
+  const sorted = toSorted(array);
   for (let i = 0; i < sorted.length; i++) {
     expect(sorted[i]).toEqual(array[i]);
   }

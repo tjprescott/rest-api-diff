@@ -332,3 +332,16 @@ export function getResolvedPath(targetPath: string, rootPath?: string): string {
     ? path.resolve(rootPath, targetPath)
     : path.resolve(targetPath);
 }
+
+/**
+ * Creates a sorted copy of an array without modifying the original array.
+ * @param array The array to sort.
+ * @param compareFn Optional. A function that defines the sort order.
+ * @returns A new array that is sorted.
+ */
+export function toSorted<T>(
+  array: T[],
+  compareFn?: (a: T, b: T) => number
+): T[] {
+  return [...array].sort(compareFn);
+}

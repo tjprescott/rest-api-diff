@@ -9,7 +9,9 @@ import {
   extractFileReferences,
   loadPaths,
   loadSwaggerFile,
+  toSorted,
 } from "../src/util.js";
+import path from "path";
 
 function getDefinitionRegistry(parser: SwaggerParser): DefinitionRegistry {
   return (parser as any).defRegistry as DefinitionRegistry;
@@ -31,7 +33,7 @@ it("has resolved paths as top-level keys", async () => {
   const regKeys = Object.keys(defRegistry);
   expect(regKeys.length).toBe(1);
   const rootPath = process.cwd();
-  const expectedPath = `${rootPath}\\test\\files\\test1a.json`;
+  const expectedPath = path.normalize(`${rootPath}/test/files/test1a.json`);
   expect(regKeys[0]).toBe(expectedPath);
   const regVals = Object.values(defRegistry);
   expect(regVals.length).toBe(1);
@@ -76,7 +78,9 @@ it("has resolved paths as top-level keys when loading a folder", async () => {
   const lhsKeys = Object.keys(lhsDefs);
   expect(lhsKeys.length).toBe(1);
   const rootPath = process.cwd();
-  const expectedLhsPath = `${rootPath}\\test\\files\\swaggerMulti\\models.json`;
+  const expectedLhsPath = path.normalize(
+    `${rootPath}/test/files/swaggerMulti/models.json`
+  );
   expect(lhsKeys[0]).toBe(expectedLhsPath);
   const regLhsVals = Object.values(lhsDefs);
   expect(regLhsVals.length).toBe(1);
@@ -89,7 +93,9 @@ it("has resolved paths as top-level keys when loading a folder", async () => {
   );
   const rhsKeys = Object.keys(rhsDefs);
   expect(lhsKeys.length).toBe(1);
-  const expectedRhsPath = `${rootPath}\\test\\files\\swaggerCombined\\combined.json`;
+  const expectedRhsPath = path.normalize(
+    `${rootPath}/test/files/swaggerCombined/combined.json`
+  );
   expect(rhsKeys[0]).toBe(expectedRhsPath);
   const regRhsVals = Object.values(lhsDefs);
   expect(regRhsVals.length).toBe(1);
@@ -123,12 +129,14 @@ it("should resolve external references", async () => {
   const swaggerContents = await loadSwaggerFile(
     "test/files/swaggerExternalReferences/operations.json"
   );
-  const root = `${cwd}\\test\\files\\swaggerExternalReferences`;
-  const references = extractFileReferences(swaggerContents, root);
-  const expected = [
-    `${cwd}\\test\\files\\common\\common.json`,
-    `${cwd}\\test\\files\\swaggerExternalReferences\\models.json`,
-    `${cwd}\\test\\files\\swaggerExternalReferences\\operations.json`,
-  ].toSorted();
-  expect(references.toSorted()).toStrictEqual(expected);
+  const root = path.normalize(`${cwd}/test/files/swaggerExternalReferences`);
+  const references = toSorted(extractFileReferences(swaggerContents, root));
+  const expected = toSorted([
+    path.normalize(`${cwd}/test/files/common/common.json`),
+    path.normalize(`${cwd}/test/files/swaggerExternalReferences/models.json`),
+    path.normalize(
+      `${cwd}/test/files/swaggerExternalReferences/operations.json`
+    ),
+  ]);
+  expect(references).toStrictEqual(expected);
 });

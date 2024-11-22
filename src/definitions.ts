@@ -4,6 +4,7 @@ import {
   getResolvedPath,
   parseReference,
   ReferenceMetadata,
+  toSorted,
 } from "./util.js";
 import path from "path";
 
@@ -28,7 +29,7 @@ class CollectionRegistry {
     for (const [filepath, value] of data.entries()) {
       const subdata = (value as any)[key];
       if (subdata !== undefined) {
-        for (const [name, _] of Object.entries(subdata).toSorted()) {
+        for (const [name, _] of toSorted(Object.entries(subdata))) {
           const resolvedPath = getResolvedPath(filepath).replace(/\\/g, "/");
           const pathKey = `${resolvedPath}#/${this.getRegistryName()}/${name}`;
           this.unreferenced.add(pathKey);
@@ -154,7 +155,7 @@ export class DefinitionRegistry {
         } else {
           let matchCopy = JSON.parse(JSON.stringify(match));
           // spread in any overriding properties
-          for (const [key, value] of Object.entries(itemCopy).toSorted()) {
+          for (const [key, value] of toSorted(Object.entries(itemCopy))) {
             matchCopy[key] = value;
           }
           return this.#expand(matchCopy, refResult.name);
@@ -169,7 +170,7 @@ export class DefinitionRegistry {
       const expanded: any = {};
       this.#expandDerivedClasses(item);
       this.#expandAllOf(item);
-      for (const [propName, propValue] of Object.entries(item).toSorted()) {
+      for (const [propName, propValue] of toSorted(Object.entries(item))) {
         expanded[propName] = this.#expand(propValue);
       }
       return expanded;
@@ -390,27 +391,27 @@ export class DefinitionRegistry {
 
   #gatherDefinitions(map: Map<string, any>) {
     for (const [path, fileData] of map.entries()) {
-      for (const [name, data] of Object.entries(
-        fileData.definitions ?? {}
-      ).toSorted()) {
+      for (const [name, data] of toSorted(
+        Object.entries(fileData.definitions ?? {})
+      )) {
         this.#visitDefinition(path, name, data);
       }
 
-      for (const [name, data] of Object.entries(
-        fileData.parameters ?? {}
-      ).toSorted()) {
+      for (const [name, data] of toSorted(
+        Object.entries(fileData.parameters ?? {})
+      )) {
         this.#visitParameter(path, name, data);
       }
 
-      for (const [name, data] of Object.entries(
-        fileData.responses ?? {}
-      ).toSorted()) {
+      for (const [name, data] of toSorted(
+        Object.entries(fileData.responses ?? {})
+      )) {
         this.#visitResponse(path, name, data);
       }
 
-      for (const [name, data] of Object.entries(
-        fileData.securityDefinitions ?? {}
-      ).toSorted()) {
+      for (const [name, data] of toSorted(
+        Object.entries(fileData.securityDefinitions ?? {})
+      )) {
         this.data.securityDefinitions.add(path, name, data);
       }
     }
