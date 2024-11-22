@@ -46,7 +46,7 @@ export class SwaggerParser {
     args: any
   ): Promise<SwaggerParser> {
     const parser = new SwaggerParser(rootPath);
-    const pathMap = await loadPaths(forceArray(paths), args);
+    const pathMap = await loadPaths(forceArray(paths), args, rootPath);
     parser.defRegistry = new DefinitionRegistry(pathMap, rootPath, args);
     parser.swaggerMap = pathMap;
     return parser;
