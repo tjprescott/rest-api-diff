@@ -14,7 +14,8 @@
     "declarationMap": true /* Create sourcemaps for d.ts files. */,
     "strict": true /* Enable all strict type-checking options. */,
     "declaration": true /* Generate .d.ts files from TypeScript and JavaScript files in your project. */,
-    "target": "es2023" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
+    "target": "ES2023" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
+    "lib": ["ES2023"],
     "skipLibCheck": true /* Skip type checking all .d.ts files. */
   },
   "include": ["./src/**/*.ts", "./test/**/*.ts"]
