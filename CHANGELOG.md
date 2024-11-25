@@ -1,8 +1,10 @@
 # @azure-tools/rest-api-diff
 
-## 0.1.7 (2024-11-22)
+## 0.1.7 (2024-11-25)
 
 - Fixed issue where paths were being sorted correctly, leading to unreadable visual diffs.
+- Changed the grouped violation structure to a dictionary where the rule name is the key. This makes
+  it easier to collapse groups and still see the name.
 
 ## 0.1.6 (2024-11-19)
 
