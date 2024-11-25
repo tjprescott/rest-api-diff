@@ -3,10 +3,54 @@ import { getApplicableRules } from "../src/rules/rules.js";
 import { DiffClientConfig } from "../src/diff-client.js";
 import { TestableDiffClient } from "./test-host.js";
 import { loadPaths, toSorted } from "../src/util.js";
+import fs from "fs";
+import os from "os";
 import path from "path";
 
 it("config should group violations when --group-violations is set", async () => {
-  const args = { "group-violations": true };
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
+  const args = { "group-violations": true, "output-folder": tempDir };
+  const config: DiffClientConfig = {
+    lhs: ["test/files/test2a.json"],
+    rhs: ["test/files/test2b.json"],
+    args: args,
+    rules: getApplicableRules(args),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  client.writeOutput();
+
+  const diffPath = path.join(tempDir, "diff.json");
+  const diffFile = JSON.parse(fs.readFileSync(diffPath, "utf8"));
+  const keys = [...Object.keys(diffFile)];
+  expect(keys).toStrictEqual(["UNGROUPED"]);
+
+  const diffInvPath = path.join(tempDir, "diff-inv.json");
+  const diffInvFile = JSON.parse(fs.readFileSync(diffInvPath, "utf8"));
+  const invKeys = [...Object.keys(diffInvFile)];
+  expect(invKeys).toStrictEqual([
+    "ignoreSwaggerPropertiesRule",
+    "ignoreSwaggerDefinitionsRule",
+  ]);
+
+  // Ensure the values are sorted by value
+  const invCounts = Object.values(diffInvFile).map(
+    (item: any) => item.items.length
+  );
+  expect(invCounts).toStrictEqual([7, 3]);
+  expect(invCounts).toStrictEqual(invCounts.sort());
+
+  // ensure name is removed from each value
+  for (const val of Object.values(diffInvFile)) {
+    expect((val as any).name).toBeUndefined();
+  }
+});
+
+it("config should not group violations when --group-violations is not set", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
+  const args = { "output-folder": tempDir };
   const config: DiffClientConfig = {
     lhs: ["test/files/test1a.json"],
     rhs: ["test/files/test1b.json"],
@@ -17,27 +61,10 @@ it("config should group violations when --group-violations is set", async () => 
   client.parse();
   client.processDiff();
   client.buildOutput();
-  const diffInvFile = client.resultFiles?.diffInverse;
-  expect((diffInvFile as Map<string, any>).size).toBe(1);
-  const key = [...(diffInvFile as Map<string, any>).keys()][0];
-  const diffInvItem = diffInvFile.get(key);
-  // ensure name is erased, since it is the map key
-  expect((diffInvItem as any).name).toBe(undefined);
-  expect(diffInvItem.items.length).toBe(4);
-});
+  client.writeOutput();
 
-it("config should not group violations when --group-violations is not set", async () => {
-  const config: DiffClientConfig = {
-    lhs: ["test/files/test1a.json"],
-    rhs: ["test/files/test1b.json"],
-    args: {},
-    rules: getApplicableRules({}),
-  };
-  const client = await TestableDiffClient.create(config);
-  client.parse();
-  client.processDiff();
-  client.buildOutput();
-  const diffInvFile = client.resultFiles?.diffInverse;
+  const filePath = path.join(tempDir, "diff-inv.json");
+  const diffInvFile = JSON.parse(fs.readFileSync(filePath, "utf8"));
   expect((diffInvFile as Array<any>).length).toBe(4);
   for (const item of diffInvFile as Array<any>) {
     expect(item.ruleName).toEqual("ignoreSwaggerPropertiesRule");
@@ -99,7 +126,11 @@ it("should compare a Swagger folder and a TypeSpec folder", async () => {
 }, 30000); // longer timeout necessary to compile TypeSpec
 
 it("should resolve external swagger references", async () => {
-  const paths = await loadPaths(["test/files/swaggerExternalReferences"], {});
+  const paths = await loadPaths(
+    ["test/files/swaggerExternalReferences"],
+    {},
+    "test/files/swaggerExternalReferences"
+  );
   const pathKeys = toSorted([...paths.keys()]);
   const cwd = process.cwd();
   const expected = toSorted([

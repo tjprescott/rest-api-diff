@@ -71,6 +71,11 @@
               "$ref": "#/definitions/Bar"
             }
           }
+        },
+        "x-ms-examples": {
+          "An amazing example.": {
+            "$ref": "./examples/example.json"
+          }
         }
       }
     }

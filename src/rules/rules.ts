@@ -11,7 +11,7 @@ import { flagTypeDifferencesRule } from "./flag-type-differences.js";
 import { compareXMsEnumRule } from "./compare-x-ms-enum.js";
 import { compareResponseRequiredRule } from "./compare-response-required.js";
 import { compareRequestRequiredRule } from "./compare-request-required.js";
-import { ignoreSwaggerDefintionsRule } from "./ignore-swagger-definitions.js";
+import { ignoreSwaggerDefinitionsRule } from "./ignore-swagger-definitions.js";
 import { compareXMsIdentifiersRule } from "./compare-x-ms-identifiers.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
@@ -49,7 +49,7 @@ export function getApplicableRules(args: any): RuleSignature[] {
 
   const preserveDefinitions = args["preserve-definitions"];
   if (!preserveDefinitions) {
-    rules.push(ignoreSwaggerDefintionsRule);
+    rules.push(ignoreSwaggerDefinitionsRule);
   }
   return rules;
 }

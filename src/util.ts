@@ -141,7 +141,8 @@ async function loadFile(path: string, args: any): Promise<Map<string, any>> {
 
 export async function loadPaths(
   paths: string[],
-  args: any
+  args: any,
+  rootPath: string
 ): Promise<Map<string, any>> {
   let jsonContents = new Map<string, any>();
   const refs = new Set<string>();
@@ -154,7 +155,7 @@ export async function loadPaths(
       ? await loadFolderContents(path, args)
       : await loadFile(path, args);
     for (const [key, value] of values.entries()) {
-      const fileRefs = extractFileReferences(value, path);
+      const fileRefs = extractFileReferences(value, rootPath);
       for (const ref of fileRefs) {
         refs.add(ref);
       }
@@ -170,7 +171,11 @@ export async function loadPaths(
     (key) => !resolvedKeys.includes(key)
   );
   if (externalPathsToLoad.length > 0) {
-    const additionalContents = await loadPaths(externalPathsToLoad, args);
+    const additionalContents = await loadPaths(
+      externalPathsToLoad,
+      args,
+      rootPath
+    );
     for (const [key, value] of additionalContents.entries()) {
       jsonContents.set(key, value);
     }
@@ -222,13 +227,17 @@ export async function loadSwaggerFile(
  */
 export function extractFileReferences(data: any, rootPath: string): string[] {
   const fileContent = JSON.stringify(data);
-  const regex = /"\$ref":\s*"(.*?)#(.*?)"/g;
+  const regex = /"\$ref":\s*"([^"]*?\.json)(?:#([^"]*?))?"/g;
   const refMatches = [...fileContent.matchAll(regex)];
   const resultSet = new Set<string>();
   for (const match of refMatches) {
     let matchPath = match[1];
     if (matchPath !== "") {
       const resolvedMatch = getResolvedPath(matchPath, rootPath);
+      // ignore examples
+      if (match[2] === undefined && matchPath.includes("examples")) {
+        continue;
+      }
       resultSet.add(resolvedMatch);
     }
   }

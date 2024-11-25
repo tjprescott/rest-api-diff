@@ -140,3 +140,15 @@ it("should resolve external references", async () => {
   ]);
   expect(references).toStrictEqual(expected);
 });
+
+it("should ignore example references", async () => {
+  const cwd = process.cwd();
+  const swaggerContents = await loadSwaggerFile(
+    "test/files/swaggerExternalReferences/operations.json"
+  );
+  const root = path.normalize(`${cwd}/test/files/swaggerExternalReferences`);
+  const references = toSorted(extractFileReferences(swaggerContents, root));
+  for (const ref of references) {
+    expect(ref.includes("examples")).toBe(false);
+  }
+});

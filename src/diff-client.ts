@@ -11,6 +11,7 @@ import { OpenAPIV2 } from "openapi-types";
 import assert from "assert";
 import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";
+import path from "path";
 
 export interface DiffClientConfig {
   lhs: string | string[];
@@ -236,30 +237,30 @@ export class DiffClient {
     // create inverse files that show only the stuff that has been pruned
     // for diagnostic purposes.
     fs.writeFileSync(
-      `${outputFolder}/lhs-inv.json`,
+      path.join(outputFolder, "lhs-inv.json"),
       JSON.stringify(results.inverse[0], null, 2)
     );
     fs.writeFileSync(
-      `${outputFolder}/rhs-inv.json`,
+      path.join(outputFolder, "rhs-inv.json"),
       JSON.stringify(results.inverse[1], null, 2)
     );
     // write the raw files to output for debugging purposes
     fs.writeFileSync(
-      `${outputFolder}/lhs-raw.json`,
+      path.join(outputFolder, "lhs-raw.json"),
       JSON.stringify(results.raw[0], null, 2)
     );
     fs.writeFileSync(
-      `${outputFolder}/rhs-raw.json`,
+      path.join(outputFolder, "rhs-raw.json"),
       JSON.stringify(results.raw[1], null, 2)
     );
     // prune the documents of any paths that are not relevant and
     // output them for visual diffing.
     fs.writeFileSync(
-      `${outputFolder}/lhs.json`,
+      path.join(outputFolder, "lhs.json"),
       JSON.stringify(results.normal[0], null, 2)
     );
     fs.writeFileSync(
-      `${outputFolder}/rhs.json`,
+      path.join(outputFolder, "rhs.json"),
       JSON.stringify(results.normal[1], null, 2)
     );
     // Report unresolved and unreferenced objects
@@ -280,15 +281,25 @@ export class DiffClient {
       ...(this.diffResults?.assumedViolations ?? []),
       ...(this.diffResults?.flaggedViolations ?? []),
     ];
-    if (allViolations.length === 0) {
-      console.log("No violations found");
-      return 0;
+
+    // write the diff file to the file system
+    if (allViolations.length !== 0) {
+      const normalPath = path.join(outputFolder, "diff.json");
+      const data = groupViolations
+        ? Object.fromEntries(results.diff)
+        : results.diff;
+      fs.writeFileSync(normalPath, JSON.stringify(data, null, 2));
     }
-    // write out the diff.json file based on the grouping preference
-    const normalPath = `${outputFolder}/diff.json`;
-    const inversePath = `${outputFolder}/diff-inv.json`;
-    fs.writeFileSync(normalPath, JSON.stringify(results.diff, null, 2));
-    fs.writeFileSync(inversePath, JSON.stringify(results.diffInverse, null, 2));
+
+    // write the inverse diff file to the file system
+    if (this.diffResults.noViolations.length !== 0) {
+      const inversePath = path.join(outputFolder, "diff-inv.json");
+      const data = groupViolations
+        ? Object.fromEntries(results.diffInverse)
+        : results.diffInverse;
+      fs.writeFileSync(inversePath, JSON.stringify(data, null, 2));
+    }
+
     // add up the length of each array
     const summary: ResultSummary = {
       flaggedViolations: this.diffResults.flaggedViolations.length,
@@ -482,7 +493,7 @@ export class DiffClient {
     if (!this.args["group-violations"]) {
       return diffs;
     }
-    const defaultRule = "assumedViolation";
+    const defaultRule = "UNGROUPED";
     const groupedDiff: { [key: string]: DiffGroupingResult } = {};
     for (const diff of diffs) {
       const ruleName = diff.ruleName ?? defaultRule;
