@@ -207,6 +207,11 @@ export class DiffClient {
     const assumedViolations = this.diffResults.assumedViolations ?? [];
     const allViolations = [...flaggedViolations, ...assumedViolations];
 
+    const diffResult = this.#buildDiffFile(convertDiffItems(allViolations));
+    const invDiffResult = this.#buildDiffFile(
+      convertDiffItems(this.diffResults.noViolations)
+    );
+
     this.resultFiles = {
       raw: [this.lhs, this.rhs],
       normal: this.#pruneDocuments(
@@ -215,8 +220,8 @@ export class DiffClient {
         this.diffResults.noViolations
       ),
       inverse: this.#pruneDocuments(this.lhs, this.rhs, allViolations),
-      diff: this.#buildDiffFile(allViolations),
-      diffInverse: this.#buildDiffFile(this.diffResults.noViolations),
+      diff: diffResult,
+      diffInverse: invDiffResult,
     };
   }
 
@@ -591,4 +596,19 @@ interface ResultSummary {
   assumedViolations: number;
   unresolvedReferences: number;
   unreferencedObjects: number;
+}
+
+function convertDiffItems(items: DiffItem[]): any[] {
+  const results: any[] = [];
+  for (const item of items) {
+    const allItem = { ...item };
+    const diff = { ...allItem.diff };
+    const path = diff.path;
+    // join and url-encode the path segments
+    const fullPath = path!.map((x: string) => encodeURIComponent(x)).join("/");
+    (diff as any).path = fullPath;
+    allItem.diff = diff;
+    results.push(allItem);
+  }
+  return results;
 }
