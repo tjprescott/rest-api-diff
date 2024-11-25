@@ -4,6 +4,7 @@ import { DiffClientConfig } from "../src/diff-client.js";
 import { TestableDiffClient } from "./test-host.js";
 import { loadPaths, toSorted } from "../src/util.js";
 import path from "path";
+import { fail } from "assert";
 
 it("config should group violations when --group-violations is set", async () => {
   const args = { "group-violations": true };
@@ -24,6 +25,9 @@ it("config should group violations when --group-violations is set", async () => 
   // ensure name is erased, since it is the map key
   expect((diffInvItem as any).name).toBe(undefined);
   expect(diffInvItem.items.length).toBe(4);
+
+  // FIXME: Verify it writes to file correctly
+  fail("Need to verify it writes to file");
 });
 
 it("config should not group violations when --group-violations is not set", async () => {
@@ -42,6 +46,9 @@ it("config should not group violations when --group-violations is not set", asyn
   for (const item of diffInvFile as Array<any>) {
     expect(item.ruleName).toEqual("ignoreSwaggerPropertiesRule");
   }
+
+  // FIXME: Verify it writes to file correctly
+  fail("Need to verify it writes to file");
 });
 
 it("should compare two files", async () => {
