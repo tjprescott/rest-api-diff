@@ -1,0 +1,15 @@
+{
+  "parameters": {
+    "name": "Fred",
+    "age": 16
+  },
+  "responses": {
+    "200": {
+      "body": {
+        "name": "Fred",
+        "age": 16
+      }
+    }
+  },
+  "title": "create an availability set."
+}

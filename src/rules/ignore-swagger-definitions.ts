@@ -8,7 +8,7 @@ const specificPathsToIgnore = [
   "securityDefinitions",
 ];
 
-export function ignoreSwaggerDefintionsRule(
+export function ignoreSwaggerDefinitionsRule(
   data: Diff<any, any>
 ): RuleResult | undefined {
   if (!data.path) return;
