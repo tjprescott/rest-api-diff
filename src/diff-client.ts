@@ -493,7 +493,7 @@ export class DiffClient {
     if (!this.args["group-violations"]) {
       return diffs;
     }
-    const defaultRule = "assumedViolation";
+    const defaultRule = "UNGROUPED";
     const groupedDiff: { [key: string]: DiffGroupingResult } = {};
     for (const diff of diffs) {
       const ruleName = diff.ruleName ?? defaultRule;

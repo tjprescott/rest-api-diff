@@ -25,7 +25,7 @@ it("config should group violations when --group-violations is set", async () => 
   const diffPath = path.join(tempDir, "diff.json");
   const diffFile = JSON.parse(fs.readFileSync(diffPath, "utf8"));
   const keys = [...Object.keys(diffFile)];
-  expect(keys).toStrictEqual(["assumedViolation"]);
+  expect(keys).toStrictEqual(["UNGROUPED"]);
 
   const diffInvPath = path.join(tempDir, "diff-inv.json");
   const diffInvFile = JSON.parse(fs.readFileSync(diffInvPath, "utf8"));
