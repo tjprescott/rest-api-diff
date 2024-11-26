@@ -6,6 +6,7 @@ import { loadPaths, toSorted } from "../src/util.js";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { fail } from "assert";
 
 it("config should group violations when --group-violations is set", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
@@ -158,4 +159,12 @@ it("should compare folders with external references", async () => {
   client.buildOutput();
   const [lhs, rhs] = client.resultFiles!.normal;
   expect(rhs).toStrictEqual(lhs);
+});
+
+it("a rule that declares noViolation should override a rule that flags a violation", async () => {
+  fail("Not implemented");
+});
+
+it("matching no rule should results in an UNGROUPED violation", async () => {
+  fail("Not implemented");
 });
