@@ -147,7 +147,9 @@ export class DiffClient {
 
   /**
    * Processes all rules against the given diff. If no rule confirms or denies
-   * an issue, the diff is treated as a failure.
+   * an issue, the diff is treated as a failure. If a rule is flagged as a violation,
+   * it can be overridden by a later rule, but as soon as a rule confirms something
+   * is not a violation, processing stops.
    * @param data the diff data to evaluate.
    * @returns an allowed DiffRuleResult. Only "ContinueProcessing" is not allowed.
    */
@@ -161,20 +163,33 @@ export class DiffClient {
       ruleName: undefined,
       diff: data,
     };
+    let finalResult: RuleResult | [RuleResult, string] | undefined = undefined;
+    let finalResultRuleName: string | undefined = undefined;
     for (const rule of this.rules) {
       const result = rule(data, lhs, rhs);
       if (result === undefined) {
         continue;
-      } else if (Array.isArray(result)) {
-        retVal.ruleResult = result[0];
-        retVal.ruleName = rule.name;
-        retVal.message = result[1];
-        break;
-      } else {
-        retVal.ruleResult = result;
-        retVal.ruleName = rule.name;
+      }
+      const ruleResult = Array.isArray(result) ? result[0] : result;
+      // continue processing rules even if a violation is found in case a later rule exempts a pattern.
+      if (ruleResult === RuleResult.FlaggedViolation) {
+        finalResult = result;
+        finalResultRuleName = rule.name;
+        continue;
+      } else if (ruleResult === RuleResult.NoViolation) {
+        finalResult = result;
+        finalResultRuleName = rule.name;
         break;
       }
+    }
+    // now apply the final rule result
+    if (finalResult && Array.isArray(finalResult)) {
+      retVal.ruleResult = finalResult[0];
+      retVal.ruleName = finalResultRuleName;
+      retVal.message = finalResult[1];
+    } else if (finalResult) {
+      retVal.ruleResult = finalResult;
+      retVal.ruleName = finalResultRuleName;
     }
     return retVal as DiffItem;
   }

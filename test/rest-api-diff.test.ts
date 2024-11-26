@@ -1,11 +1,13 @@
 import { expect, it } from "vitest";
-import { getApplicableRules } from "../src/rules/rules.js";
+import { getApplicableRules, RuleResult } from "../src/rules/rules.js";
 import { DiffClientConfig } from "../src/diff-client.js";
 import { TestableDiffClient } from "./test-host.js";
 import { loadPaths, toSorted } from "../src/util.js";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { fail } from "assert";
+import { Diff } from "deep-diff";
 
 it("config should group violations when --group-violations is set", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
@@ -158,4 +160,49 @@ it("should compare folders with external references", async () => {
   client.buildOutput();
   const [lhs, rhs] = client.resultFiles!.normal;
   expect(rhs).toStrictEqual(lhs);
+});
+
+function noNameRule(data: Diff<any, any>): any {
+  if (data.path?.includes("name")) {
+    return RuleResult.FlaggedViolation;
+  }
+}
+
+function nameOkayRule(data: Diff<any, any>): any {
+  if (data.path?.includes("name")) {
+    return RuleResult.NoViolation;
+  }
+}
+
+it("a rule that declares noViolation should override a rule that flags a violation", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/test1a.json"],
+    rhs: ["test/files/test1b.json"],
+    args: {},
+    rules: [noNameRule, nameOkayRule],
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  for (const violation of client.diffResults?.noViolations ?? []) {
+    expect(violation.ruleName).toBe("nameOkayRule");
+  }
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+});
+
+it("matching no rule should results in an UNGROUPED violation", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/test1a.json"],
+    rhs: ["test/files/test1b.json"],
+    args: {},
+    rules: [],
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.noViolations.length).toBe(0);
+  for (const violation of client.diffResults?.assumedViolations ?? []) {
+    expect(violation.ruleName).toBeUndefined();
+  }
 });

@@ -124,6 +124,4 @@ rule can make one of three determinations:
   This will be reported by the tool and may include an amplifying message. It will appear in a visual diff.
 - `RuleResult.ContinueProcessing`: the logic of the rule doesn't apply to this diff and thus the tool should continue processing rules.
 
-When processing a diff item against the rules, if either `NoViolation` or `FlaggedViolation` are returned by a rule, it immediately
-suspends processing any additional rules. If all rules return `ContinueProcessing` then the diff is assumed to affect the API surface
-area and is marked as `RuleResult.AssumedViolation`. It will be reported by the tool and will appear in a visual diff.
+When processing a diff item against the rules, if `NoViolation` is returned by a rule, it immediately suspends processing additional rules. If `FlaggedViolation` is returned, rules will continue to be processed in case another rule marks it as `NoViolation`. If all rules are run and no determination is made, then the diff is assumed to affect the API surface area and is tracked as an assumed violation. It will be reported by the tool and will appear in a visual diff. When violations are grouped, these violations will appear in the `UNGROUPED` group.
