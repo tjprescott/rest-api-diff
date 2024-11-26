@@ -33,7 +33,7 @@ import { xConsumesChangedRule } from "./x-consumes-changed.js";
 import { xParameterChangedRule } from "./x-parameter-changed.js";
 import { xRequiredChangedRule } from "./x-required-changed.js";
 import { xAdditionalPropertiesChangedRule } from "./x-additional-properties-changed.js";
-import { xIgnoreObjectAddedRule } from "./x-ignore-object-added.js";
+import { xIgnoreObjectChangedRule } from "./x-ignore-object-changed.js";
 import { xAnyOfChangedRule } from "./x-any-of-changed.js";
 import { xReadOnlyChangedRule } from "./x-read-only-changed.js";
 import { xHeadersAddedRule } from "./x-headers-added.js";
@@ -41,6 +41,7 @@ import { xSystemDataAddedRule } from "./x-system-data-added.js";
 import { xPropertyRemovedRule } from "./x-property-removed.js";
 import { xDefaultFalseRemovedRule } from "./x-default-false-removed.js";
 import { xDiskControllerTypeItemsRemovedRule } from "./x-disk-controller-type-items-removed.js";
+import { xPropertyAddedRule } from "./x-property-added.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -97,11 +98,12 @@ export function getApplicableRules(args: any): RuleSignature[] {
     xRequiredChangedRule,
     xAdditionalPropertiesChangedRule,
     xSystemDataAddedRule,
-    xIgnoreObjectAddedRule,
+    xIgnoreObjectChangedRule,
     xAnyOfChangedRule,
     xReadOnlyChangedRule,
     xHeadersAddedRule,
     xPropertyRemovedRule,
+    xPropertyAddedRule,
     xDefaultFalseRemovedRule,
     xDiskControllerTypeItemsRemovedRule,
   ];

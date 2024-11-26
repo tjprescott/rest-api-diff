@@ -6,7 +6,6 @@ import { RuleResult } from "./rules.js";
  */
 export function xPathRemovedRule(data: Diff<any, any>): RuleResult | undefined {
   if (!data.path || data.path.length !== 2) return;
-  if (data.kind === "D") {
-    return RuleResult.FlaggedViolation;
-  }
+  if (data.path[0] !== "paths" || data.kind !== "D") return;
+  return RuleResult.FlaggedViolation;
 }

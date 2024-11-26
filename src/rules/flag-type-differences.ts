@@ -12,10 +12,6 @@ export function flagTypeDifferencesRule(
   if (lastPath !== "type") return;
   const lhs = (data as any).lhs ?? "undefined";
   const rhs = (data as any).rhs ?? "undefined";
-
-  // This is handled by a different rule
-  if (lhs === "undefined" && rhs === "object") return;
-
   const message = `Type changed from '${lhs}' to '${rhs}'.`;
   return [RuleResult.FlaggedViolation, message];
 }
