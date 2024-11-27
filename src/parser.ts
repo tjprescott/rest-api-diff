@@ -415,6 +415,6 @@ export class SwaggerParser {
       }
     }
     normalizedPath = pathComponents.join("");
-    return normalizedPath;
+    return normalizedPath.toLowerCase();
   }
 }
