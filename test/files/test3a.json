@@ -14,7 +14,21 @@
   "consumes": ["application/json"],
   "tags": [],
   "paths": {
-    "/getSomeFooThing": {
+    "blah.blah.com/getSomeFooThing": {
+      "get": {
+        "operationId": "GetFoo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "management.azure.com/getSomeFooThing": {
       "get": {
         "operationId": "GetFoo",
         "parameters": [],

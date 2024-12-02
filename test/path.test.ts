@@ -88,5 +88,8 @@ it("should match path in a case-insensitive way", async () => {
   client.processDiff();
   expect(client.diffResults?.flaggedViolations.length).toBe(0);
   expect(client.diffResults?.noViolations.length).toBe(0);
-  expect(client.diffResults?.assumedViolations.length).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(2);
+  for (const diff of client.diffResults?.assumedViolations || []) {
+    expect(diff.diff.path![1].startsWith("blah.blah.com")).toBe(true);
+  }
 });
