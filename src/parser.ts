@@ -415,6 +415,10 @@ export class SwaggerParser {
       }
     }
     normalizedPath = pathComponents.join("");
+    // for management plane, path is case-insensitive
+    if (normalizedPath.startsWith("management.azure.com")) {
+      normalizedPath = normalizedPath.toLowerCase();
+    }
     return normalizedPath;
   }
 }
