@@ -127,11 +127,7 @@ it("should compare a Swagger folder and a TypeSpec folder", async () => {
 }, 30000); // longer timeout necessary to compile TypeSpec
 
 it("should resolve external swagger references", async () => {
-  const paths = await loadPaths(
-    ["test/files/swaggerExternalReferences"],
-    {},
-    "test/files/swaggerExternalReferences"
-  );
+  const paths = await loadPaths(["test/files/swaggerExternalReferences"], {});
   const pathKeys = toSorted([...paths.keys()]);
   const cwd = process.cwd();
   const expected = toSorted([

@@ -28,18 +28,6 @@ const args = await yargs(hideBin(process.argv))
     coerce: (arg) => arg.map(String),
     default: process.env.RHS ? process.env.RHS.split(" ") : undefined,
   })
-  .options("lhs-root", {
-    type: "string",
-    describe:
-      "The root path to use when resolving relative LHS file references. If only one value is specified, assumes that. Otherwise, assumes cwd.",
-    default: process.env.LHS_ROOT,
-  })
-  .options("rhs-root", {
-    type: "string",
-    describe:
-      "The root path to use when resolving relative RHS file references. If only one value is specified, assumes that. Otherwise, assumes cwd.",
-    default: process.env.RHS_ROOT,
-  })
   .options("compile-tsp", {
     type: "boolean",
     describe:

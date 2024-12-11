@@ -26,9 +26,6 @@ but will not search subfolders.
 
 ### Options
 
-- `--lhs-root`: The root path to use when resolving relative file references for the left-hand side. Defaults
-  to `--lhs` if only one value is specified, otherwise defaults to the current working directory.
-- `--rhs-root`: Same as `--lhs-root` but for the right-hand side.
 - `--compile-tsp`: The tool will attempt to compile TypeSpec files to Swagger using the
   `@azure-tools/autorest` emitter. If existing Swagger files are found, they will be overwritten
   by the compilation.

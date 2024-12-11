@@ -24,30 +24,23 @@ export class SwaggerParser {
   private defaultProduces?: string[];
   private errorSchemas: Map<string, OpenAPIV2.SchemaObject> = new Map();
   private host?: string;
-  private rootPath: string;
   private result: any = {};
   private defRegistry?: DefinitionRegistry;
   private swaggerMap?: Map<string, any>;
 
-  private constructor(rootPath: string) {
-    this.rootPath = rootPath;
-  }
-
   /**
    * Creates a new SwaggerParser instance asynchronously.
    * @param paths the path or paths to load
-   * @param rootPath the path from which to resolve any relative paths
    * @param args arguments
    * @returns initialized SwaggerParser instance
    */
   static async create(
     paths: string | string[],
-    rootPath: string,
     args: any
   ): Promise<SwaggerParser> {
-    const parser = new SwaggerParser(rootPath);
-    const pathMap = await loadPaths(forceArray(paths), args, rootPath);
-    parser.defRegistry = new DefinitionRegistry(pathMap, rootPath, args);
+    const parser = new SwaggerParser();
+    const pathMap = await loadPaths(forceArray(paths), args);
+    parser.defRegistry = new DefinitionRegistry(pathMap, args);
     parser.swaggerMap = pathMap;
     return parser;
   }
@@ -351,7 +344,7 @@ export class SwaggerParser {
     if (isReference(value)) {
       // get the value of the $ref key
       const ref = (value as any)["$ref"];
-      const refResult = parseReference(ref, this.rootPath);
+      const refResult = parseReference(ref, undefined);
       if (!refResult) {
         if (ref.includes("examples")) {
           // special case examples since they simply don't matter

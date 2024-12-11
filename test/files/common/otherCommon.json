@@ -1,0 +1,16 @@
+{
+  "swagger": "2.0",
+  "definitions": {
+    "Bar": {
+      "type": "object",
+      "properties": {
+        "foo": {
+          "schema": {
+            "$ref": "../common.json#/definitions/Foo"
+          }
+        }
+      },
+      "required": ["foo"]
+    }
+  }
+}

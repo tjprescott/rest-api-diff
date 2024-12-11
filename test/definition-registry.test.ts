@@ -141,6 +141,24 @@ it("should resolve external references", async () => {
   expect(references).toStrictEqual(expected);
 });
 
+it("should resolve external references with relative references", async () => {
+  const cwd = process.cwd();
+  const swaggerContents = await loadSwaggerFile(
+    "test/files/swaggerExternalReferences/operations.json"
+  );
+  const root = path.normalize(`${cwd}/test/files/swaggerExternalReferences`);
+  const references = toSorted(extractFileReferences(swaggerContents, root));
+  const expected = toSorted([
+    path.normalize(`${cwd}/test/files/common/common.json`),
+    path.normalize(`${cwd}/test/files/common/commonOther.json`),
+    path.normalize(`${cwd}/test/files/swaggerExternalReferences/models.json`),
+    path.normalize(
+      `${cwd}/test/files/swaggerExternalReferences/operations.json`
+    ),
+  ]);
+  expect(references).toStrictEqual(expected);
+});
+
 it("should ignore example references", async () => {
   const cwd = process.cwd();
   const swaggerContents = await loadSwaggerFile(

@@ -7,6 +7,7 @@
   no further rules are run.
 - Fixed issue where the tool sometimes would fail if paths used forward or backslashes.
 - Fixed issue where a difference in body parameter names would result in false positive violations.
+- Removed `--lhs-root` and `--rhs-root` options. These are no longer needed.
 
 ## 0.1.7 (2024-11-25)
 
