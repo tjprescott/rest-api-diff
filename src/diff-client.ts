@@ -42,8 +42,8 @@ export class DiffClient {
   /** Creates an instance of the DiffClient class asynchronously. */
   static async create(config: DiffClientConfig): Promise<DiffClient> {
     const client = new DiffClient(config);
-    const lhs = client.args["lhs"];
-    const rhs = client.args["rhs"];
+    const lhs = client.args["lhs"].map((x: string) => path.resolve(x));
+    const rhs = client.args["rhs"].map((x: string) => path.resolve(x));
     const lhsRoot =
       config.args["lhs-root"] ?? client.#getDefaultRootPath("lhs", lhs);
     const rhsRoot =
