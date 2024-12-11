@@ -44,13 +44,9 @@ export class DiffClient {
     const client = new DiffClient(config);
     const lhs = client.args["lhs"].map((x: string) => path.resolve(x));
     const rhs = client.args["rhs"].map((x: string) => path.resolve(x));
-    const lhsRoot =
-      config.args["lhs-root"] ?? client.#getDefaultRootPath("lhs", lhs);
-    const rhsRoot =
-      config.args["rhs-root"] ?? client.#getDefaultRootPath("rhs", rhs);
 
-    const lhsParser = await SwaggerParser.create(lhs, lhsRoot, client.args);
-    const rhsParser = await SwaggerParser.create(rhs, rhsRoot, client.args);
+    const lhsParser = await SwaggerParser.create(lhs, client.args);
+    const rhsParser = await SwaggerParser.create(rhs, client.args);
     client.lhsParser = lhsParser;
     client.rhsParser = rhsParser;
     return client;
@@ -369,29 +365,6 @@ export class DiffClient {
     if (this.args["verbose"]) {
       console.log(message);
     }
-  }
-
-  /**
-   * Applies a heuristic to attempt to automatically resolve a root path and
-   * avoid having to specify --lhs-root or --rhs-root.
-   * @param side the side to get the default root path for. Used for the logging message only.
-   * @param paths the paths to use to determine the default root path.
-   */
-  #getDefaultRootPath(side: "lhs" | "rhs", paths: string[]): string {
-    let defaultPath: string = "";
-    if (paths.length === 1) {
-      // if the one path is a file, use the folder, otherwise use the path
-      const stat = fs.statSync(paths[0]);
-      if (stat.isDirectory()) {
-        defaultPath = paths[0];
-      } else {
-        defaultPath = process.cwd();
-      }
-    } else {
-      defaultPath = process.cwd();
-    }
-    this.#logIfVerbose(`Default ${side} root path: ${defaultPath}`);
-    return defaultPath;
   }
 
   /**

@@ -6,6 +6,7 @@
   there is a rule that markes it as NoViolation. If I diff is determined to be NoViolation,
   no further rules are run.
 - Fixed issue where the tool sometimes would fail if paths used forward or backslashes.
+- Removed `--lhs-root` and `--rhs-root` options. These are no longer needed.
 
 ## 0.1.7 (2024-11-25)
 

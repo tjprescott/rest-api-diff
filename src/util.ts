@@ -23,17 +23,12 @@ export interface ReferenceMetadata {
  * Compile various sources of path information into a canonical set of
  * reference metadata.
  * @param refs The $ref value to parse.
- * @param rootPath The root path to use when resolving relative paths.
  * @param filePath A file path to use when resolving relative paths.
  */
 export function parseReference(
   ref: string,
-  rootPath?: string,
   filePath?: string
 ): ReferenceMetadata | undefined {
-  if (!rootPath && !filePath) {
-    throw new Error("At least one of rootPath or filePath must be provided.");
-  }
   // replace backslashes with forward slashes since that is what
   // the regex expects.
   ref = ref.replace(/\\/g, "/");
@@ -49,17 +44,14 @@ export function parseReference(
   let fullPath: string | undefined = undefined;
   let expandedRef: string | undefined = undefined;
   if (relPath) {
-    if (rootPath === undefined) {
+    if (filePath === undefined) {
       throw new Error(
-        `Relative path ${relPath} cannot be resolved without rootPath.`
+        `Relative path ${relPath} cannot be resolved without filePath.`
       );
     }
-    fullPath = path.normalize(getResolvedPath(relPath, rootPath));
-    expandedRef = getResolvedPath(originalRef, rootPath);
+    fullPath = path.normalize(getResolvedPath(relPath, filePath));
+    expandedRef = getResolvedPath(originalRef, filePath);
   } else {
-    if (filePath === undefined) {
-      throw new Error(`Path ${relPath} cannot be resolved without filePath.`);
-    }
     fullPath = filePath;
     expandedRef = `${filePath}#/${section}/${name}`;
   }
@@ -141,8 +133,7 @@ async function loadFile(path: string, args: any): Promise<Map<string, any>> {
 
 export async function loadPaths(
   paths: string[],
-  args: any,
-  rootPath: string
+  args: any
 ): Promise<Map<string, any>> {
   let jsonContents = new Map<string, any>();
   const refs = new Set<string>();
@@ -155,7 +146,8 @@ export async function loadPaths(
       ? await loadFolderContents(path, args)
       : await loadFile(path, args);
     for (const [key, value] of values.entries()) {
-      const fileRefs = extractFileReferences(value, rootPath);
+      // FIXME: Fix this!
+      const fileRefs = extractFileReferences(value, "");
       for (const ref of fileRefs) {
         refs.add(ref);
       }
@@ -171,11 +163,7 @@ export async function loadPaths(
     (key) => !resolvedKeys.includes(key)
   );
   if (externalPathsToLoad.length > 0) {
-    const additionalContents = await loadPaths(
-      externalPathsToLoad,
-      args,
-      rootPath
-    );
+    const additionalContents = await loadPaths(externalPathsToLoad, args);
     for (const [key, value] of additionalContents.entries()) {
       jsonContents.set(key, value);
     }
