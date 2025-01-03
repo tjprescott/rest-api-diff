@@ -272,6 +272,12 @@ export class SwaggerParser {
         const hostParams = this.parameterizedHost?.parameters ?? [];
         const allParams = [...(val as Array<any>), ...hostParams];
 
+        // if there is a param with "in" set to "body"
+        const bodyParam = allParams.find((p) => p.in === "body");
+        if (bodyParam) {
+          bodyParam.name = "_BODY_";
+        }
+
         const expanded = this.#parseNode(allParams);
         // ensure parameters are sorted by name since this ordering doesn't
         // matter from a REST API perspective.

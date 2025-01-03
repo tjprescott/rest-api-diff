@@ -6,7 +6,6 @@ import { loadPaths, toSorted } from "../src/util.js";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { fail } from "assert";
 import { Diff } from "deep-diff";
 
 it("config should group violations when --group-violations is set", async () => {
@@ -205,4 +204,19 @@ it("matching no rule should results in an UNGROUPED violation", async () => {
   for (const violation of client.diffResults?.assumedViolations ?? []) {
     expect(violation.ruleName).toBeUndefined();
   }
+});
+
+it("body parameter names should be normalized for stable sorting", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/test4a.json"],
+    rhs: ["test/files/test4b.json"],
+    args: {},
+    rules: [],
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.noViolations.length).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
 });

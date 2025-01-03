@@ -6,6 +6,7 @@
   there is a rule that markes it as NoViolation. If I diff is determined to be NoViolation,
   no further rules are run.
 - Fixed issue where the tool sometimes would fail if paths used forward or backslashes.
+- Fixed issue where a difference in body parameter names would result in false positive violations.
 
 ## 0.1.7 (2024-11-25)
 
