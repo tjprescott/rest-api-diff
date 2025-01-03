@@ -275,7 +275,7 @@ export class SwaggerParser {
         // if there is a param with "in" set to "body"
         const bodyParam = allParams.find((p) => p.in === "body");
         if (bodyParam) {
-          bodyParam.name = "BODY";
+          bodyParam.name = "_BODY_";
         }
 
         const expanded = this.#parseNode(allParams);
