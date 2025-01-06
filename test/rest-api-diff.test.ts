@@ -132,12 +132,16 @@ it("should resolve external swagger references", async () => {
   const cwd = process.cwd();
   const expected = toSorted([
     path.normalize(`${cwd}/test/files/common/common.json`),
+    path.normalize(`${cwd}/test/files/common/otherCommon.json`),
+    path.normalize(
+      `${cwd}/test/files/swaggerExternalReferences/externalRelativeReferences.json`
+    ),
     path.normalize(`${cwd}/test/files/swaggerExternalReferences/models.json`),
     path.normalize(
       `${cwd}/test/files/swaggerExternalReferences/operations.json`
     ),
   ]);
-  expect(paths.size).toBe(3);
+  expect(paths.size).toBe(5);
   expect(pathKeys).toStrictEqual(expected);
 });
 

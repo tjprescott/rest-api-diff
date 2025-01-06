@@ -344,7 +344,7 @@ export class SwaggerParser {
     if (isReference(value)) {
       // get the value of the $ref key
       const ref = (value as any)["$ref"];
-      const refResult = parseReference(ref, undefined);
+      const refResult = parseReference(ref);
       if (!refResult) {
         if (ref.includes("examples")) {
           // special case examples since they simply don't matter

@@ -6,7 +6,7 @@
       "properties": {
         "foo": {
           "schema": {
-            "$ref": "../common.json#/definitions/Foo"
+            "$ref": "./common.json#/definitions/Foo"
           }
         }
       },

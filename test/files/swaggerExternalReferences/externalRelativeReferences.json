@@ -38,7 +38,7 @@
               "type": "object",
               "properties": {
                 "body": {
-                  "$ref": "../common/common.json#/definitions/Foo"
+                  "$ref": "../common/otherCommon.json#/definitions/Bar"
                 }
               },
               "required": ["body"]

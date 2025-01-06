@@ -136,7 +136,7 @@ export class DefinitionRegistry {
       const itemCopy = JSON.parse(JSON.stringify(item));
       const ref = item["$ref"];
       delete itemCopy["$ref"];
-      const refResult = parseReference(ref, this.currentPath);
+      const refResult = parseReference(ref);
       if (!refResult) {
         return item;
       }
@@ -189,7 +189,7 @@ export class DefinitionRegistry {
     }
     const anyOf = [];
     for (const derived of derivedClasses) {
-      const refResult = parseReference(derived, this.currentPath);
+      const refResult = parseReference(derived);
       if (!refResult) {
         throw new Error(`Could not parse reference: ${derived}`);
       }
@@ -336,7 +336,7 @@ export class DefinitionRegistry {
     if (Array.isArray(allOf) && allOf.length === 1 && isReference(allOf[0])) {
       // allOf is targeting a base class
       const ref = allOf[0].$ref;
-      const refResult = parseReference(ref, filePath);
+      const refResult = parseReference(ref);
       if (!refResult) {
         throw new Error(`Could not parse reference: ${ref}`);
       }
@@ -408,7 +408,7 @@ export class DefinitionRegistry {
     // ensure each base class has a list of derived classes for use
     // when interpretting allOf.
     for (const [ref, set] of this.polymorphicMap.entries()) {
-      const refResult = parseReference(ref, this.currentPath);
+      const refResult = parseReference(ref);
       if (!refResult) {
         throw new Error(`Could not parse reference: ${ref}`);
       }

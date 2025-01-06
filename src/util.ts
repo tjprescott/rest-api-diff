@@ -2,17 +2,15 @@ import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";
 import { exec } from "child_process";
 import path from "path";
-import { off } from "process";
 
 const typespecOutputDir = `${process.cwd()}/tsp-output`;
+const referenceRegex = /"\$ref":\s*"([^"]*?\.json)(?:#([^"]*?))?"/gm;
 
 export interface ReferenceMetadata {
   /** Short name of the reference. This is not sufficient to avoid collisions but it often useful. */
   name: string;
   /** The registry this reference points to. */
   registry: RegistryKind;
-  /** The original, unaltered version of $ref. */
-  original: string;
   /** The fully expanded path to the source file. */
   fullPath: string;
   /** The fully expanded reference. */
@@ -25,10 +23,11 @@ export interface ReferenceMetadata {
  * @param refs The $ref value to parse.
  * @param filePath A file path to use when resolving relative paths.
  */
-export function parseReference(
-  ref: string,
-  filePath?: string
-): ReferenceMetadata | undefined {
+export function parseReference(ref: string): ReferenceMetadata | undefined {
+  if (ref.startsWith(".")) {
+    throw new Error(`Unexpected relative path: ${ref}`);
+  }
+
   // replace backslashes with forward slashes since that is what
   // the regex expects.
   ref = ref.replace(/\\/g, "/");
@@ -38,28 +37,15 @@ export function parseReference(
     return undefined;
   }
   const originalRef = match[0];
-  let relPath = match[1];
+  let fullPath = getResolvedPath(match[1]);
   const section = match[2];
   const name = match[3];
-  let fullPath: string | undefined = undefined;
-  let expandedRef: string | undefined = undefined;
-  if (relPath) {
-    if (filePath === undefined) {
-      throw new Error(
-        `Relative path ${relPath} cannot be resolved without filePath.`
-      );
-    }
-    fullPath = path.normalize(getResolvedPath(relPath, filePath));
-    expandedRef = getResolvedPath(originalRef, filePath);
-  } else {
-    fullPath = filePath;
-    expandedRef = `${filePath}#/${section}/${name}`;
-  }
+  const expandedRef = getResolvedPath(originalRef);
   if (!fullPath) {
-    throw new Error("fullPath cannot be undefined.");
+    throw new Error("Unexpected fullPath undefined.");
   }
   if (!expandedRef) {
-    throw new Error("expandedRef cannot be undefined.");
+    throw new Error("Unexpected expandedRef undefined.");
   }
   let registry: RegistryKind;
   switch (section) {
@@ -81,7 +67,6 @@ export function parseReference(
   return {
     name: name,
     registry: registry,
-    original: originalRef,
     fullPath: fullPath,
     expandedRef: expandedRef,
   };
@@ -146,8 +131,7 @@ export async function loadPaths(
       ? await loadFolderContents(path, args)
       : await loadFile(path, args);
     for (const [key, value] of values.entries()) {
-      // FIXME: Fix this!
-      const fileRefs = extractFileReferences(value, "");
+      const fileRefs = await extractFileReferences(key);
       for (const ref of fileRefs) {
         refs.add(ref);
       }
@@ -171,20 +155,33 @@ export async function loadPaths(
   return jsonContents;
 }
 
-/** Expands all local references into fully-qualified ones. */
+/** Expands all references into fully-qualified ones and ensures consistent use
+ * of forward slashes.
+ */
 function normalizeReferences(filepath: string, content: string): string {
   // ensure backslashes are replaced with forward slashes
   filepath = getResolvedPath(filepath).replace(/\\/g, "/");
-  const regex = /"\$ref": ("#\/\w+\/[\w\.]+")/gm;
-  const updated = content.replace(regex, (_, p1) => {
-    const newRef = `"${filepath}${p1.slice(1)}`;
-    return `"$ref": ${newRef}`;
+
+  // Expand all relative references
+  const relativeRefRegex = referenceRegex;
+  let updated = content.replace(relativeRefRegex, (_, relPath, target) => {
+    const resolvedPath = getResolvedPath(relPath, filepath).replace(/\\/g, "/");
+    const newRef = target ? `${resolvedPath}#${target}` : resolvedPath;
+    return `"$ref": "${newRef}"`;
+  });
+
+  // Expand all local references
+  const localRefRegex = /"\$ref": "(#\/\w+\/[\w\.]+)"/gm;
+  updated = updated.replace(localRefRegex, (_, target) => {
+    const newRef = `${filepath}${target}`;
+    return `"$ref": "${newRef}"`;
   });
   return updated;
 }
 
 /**
- * Loads Swagger files. If the file is not a Swagger file, it will return undefined.
+ * Load a Swagger file with paths normalized and relative references expanded into full-qualified
+ * ones. If the file is not a Swagger file, it will return undefined.
  */
 export async function loadSwaggerFile(
   sourcePath: string
@@ -208,27 +205,47 @@ export async function loadSwaggerFile(
 
 /**
  * Extracts from the referenced file any file references from $ref
- * usages. Returns an array of file paths that are referenced.
+ * usages. Returns an array of file paths that are referenced. Will
+ * recursively search for references in the referenced files. Ignores
+ * examples.
  * @param data The JSON data to search for references.
- * @param rootPath The root path to use when resolving relative paths.
+ * @param path The path to the file.
  * @returns An array of file paths that are referenced.
  */
-export function extractFileReferences(data: any, rootPath: string): string[] {
-  const fileContent = JSON.stringify(data);
-  const regex = /"\$ref":\s*"([^"]*?\.json)(?:#([^"]*?))?"/g;
-  const refMatches = [...fileContent.matchAll(regex)];
-  const resultSet = new Set<string>();
-  for (const match of refMatches) {
-    let matchPath = match[1];
-    if (matchPath !== "") {
-      const resolvedMatch = getResolvedPath(matchPath, rootPath);
-      // ignore examples
-      if (match[2] === undefined && matchPath.includes("examples")) {
-        continue;
-      }
-      resultSet.add(resolvedMatch);
+export async function extractFileReferences(path: string): Promise<string[]> {
+  const visited = new Set<string>();
+
+  async function extractFileReferencesInternal(
+    path: string
+  ): Promise<string[]> {
+    if (visited.has(path)) {
+      return [];
     }
+    const resultSet = new Set<string>();
+    const fileContents = JSON.stringify(await loadSwaggerFile(path));
+    const refMatches = [...fileContents.matchAll(referenceRegex)];
+    for (const match of refMatches) {
+      let matchPath = match[1];
+      if (matchPath !== "") {
+        const resolvedMatch = getResolvedPath(matchPath, path);
+        // ignore examples
+        if (match[2] === undefined && matchPath.includes("examples")) {
+          continue;
+        }
+        resultSet.add(resolvedMatch);
+      }
+    }
+    visited.add(path);
+    // recursively search for new references within the referenced files
+    for (const childPath of resultSet) {
+      const nestedRefs = await extractFileReferencesInternal(childPath);
+      for (const ref of nestedRefs) {
+        resultSet.add(ref);
+      }
+    }
+    return [...resultSet];
   }
+  const resultSet = await extractFileReferencesInternal(path);
   return [...resultSet];
 }
 
@@ -326,7 +343,7 @@ export function getResolvedPath(targetPath: string, rootPath?: string): string {
     throw new Error("Root path must be provided to resolve relative paths.");
   }
   return rootPath
-    ? path.resolve(rootPath, targetPath)
+    ? path.resolve(path.dirname(rootPath), targetPath)
     : path.resolve(targetPath);
 }
 
