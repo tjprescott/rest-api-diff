@@ -4,13 +4,7 @@ import { getApplicableRules } from "../src/rules/rules.js";
 import { TestableDiffClient } from "./test-host.js";
 import { DefinitionRegistry, RegistryKind } from "../src/definitions.js";
 import { SwaggerParser } from "../src/parser.js";
-import { fail } from "assert";
-import {
-  extractFileReferences,
-  loadPaths,
-  loadSwaggerFile,
-  toSorted,
-} from "../src/util.js";
+import { extractFileReferences, toSorted } from "../src/util.js";
 import path from "path";
 
 function getDefinitionRegistry(parser: SwaggerParser): DefinitionRegistry {
@@ -126,11 +120,10 @@ it("has simple values as item keys when loading a folder", async () => {
 
 it("should resolve external references", async () => {
   const cwd = process.cwd();
-  const swaggerContents = await loadSwaggerFile(
-    "test/files/swaggerExternalReferences/operations.json"
+  const filePath = path.normalize(
+    `${cwd}/test/files/swaggerExternalReferences/operations.json`
   );
-  const root = path.normalize(`${cwd}/test/files/swaggerExternalReferences`);
-  const references = toSorted(extractFileReferences(swaggerContents, root));
+  const references = toSorted(await extractFileReferences(filePath));
   const expected = toSorted([
     path.normalize(`${cwd}/test/files/common/common.json`),
     path.normalize(`${cwd}/test/files/swaggerExternalReferences/models.json`),
@@ -141,13 +134,26 @@ it("should resolve external references", async () => {
   expect(references).toStrictEqual(expected);
 });
 
+it("should resolve external references with relative references", async () => {
+  const cwd = process.cwd();
+  const filePath = path.normalize(
+    `${cwd}/test/files/swaggerExternalReferences/externalRelativeReferences.json`
+  );
+  const references = toSorted(await extractFileReferences(filePath));
+  const expected = toSorted([
+    path.normalize(`${cwd}/test/files/common/common.json`),
+    path.normalize(`${cwd}/test/files/common/otherCommon.json`),
+    path.normalize(`${cwd}/test/files/swaggerExternalReferences/models.json`),
+  ]);
+  expect(references).toStrictEqual(expected);
+});
+
 it("should ignore example references", async () => {
   const cwd = process.cwd();
-  const swaggerContents = await loadSwaggerFile(
-    "test/files/swaggerExternalReferences/operations.json"
+  const filePath = path.normalize(
+    `${cwd}/test/files/swaggerExternalReferences/operations.json`
   );
-  const root = path.normalize(`${cwd}/test/files/swaggerExternalReferences`);
-  const references = toSorted(extractFileReferences(swaggerContents, root));
+  const references = toSorted(await extractFileReferences(filePath));
   for (const ref of references) {
     expect(ref.includes("examples")).toBe(false);
   }
