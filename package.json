@@ -1,6 +1,6 @@
 {
   "name": "@azure-tools/rest-api-diff",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "author": "Microsoft Corporation",
   "description": "Compares two Swagger definitions to identify relevant differences.",
   "license": "MIT",
