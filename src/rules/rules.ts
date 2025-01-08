@@ -13,6 +13,7 @@ import { compareResponseRequiredRule } from "./compare-response-required.js";
 import { compareRequestRequiredRule } from "./compare-request-required.js";
 import { ignoreSwaggerDefinitionsRule } from "./ignore-swagger-definitions.js";
 import { compareXMsIdentifiersRule } from "./compare-x-ms-identifiers.js";
+import { ignoreXMsExamplesRule } from "./ignore-x-ms-examples.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -36,6 +37,7 @@ export function getApplicableRules(args: any): RuleSignature[] {
     ignoreSwaggerPropertiesRule,
     ignoreIrrelevantResponsePropertiesRule,
     ignoreXMsErrorCodeHeaderRule,
+    ignoreXMsExamplesRule,
     ignoreApiVersionMinLengthRule,
     ignoreFormatUriRule,
     ignoreNextLinkFormatUriRule,

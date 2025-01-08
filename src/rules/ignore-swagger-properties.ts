@@ -27,7 +27,6 @@ const swaggerPropertiesToIgnore = [
   "x-ms-client-name",
   "x-ms-code-generation-settings",
   "x-ms-enum",
-  "x-ms-examples",
   "x-ms-parameter-grouping",
   "x-ms-parameter-location",
 ];

@@ -216,6 +216,15 @@ export class DiffClient {
     };
   }
 
+  hasViolations(summary: ResultSummary): boolean {
+    return (
+      summary.flaggedViolations > 0 ||
+      summary.assumedViolations > 0 ||
+      summary.unresolvedReferences > 0 ||
+      summary.unreferencedObjects > 0
+    );
+  }
+
   /** Write results to output files and print summary to console. */
   writeOutput() {
     if (!this.resultFiles) {
@@ -321,25 +330,30 @@ export class DiffClient {
       unresolvedReferences: this.rhsParser.getUnresolvedReferences().length,
       unreferencedObjects: this.rhsParser.getUnreferencedTotal(),
     };
-    console.warn("\n== ISSUES FOUND! ==\n");
+
     const preserveDefinitions = this.args["preserve-definitions"];
-    if (summary.flaggedViolations) {
-      if (summary.rulesViolated) {
-        console.warn(
-          `Flagged Violations: ${summary.flaggedViolations} across ${summary.rulesViolated} rules`
-        );
-      } else {
-        console.warn(`Flagged Violations: ${summary.flaggedViolations}`);
+    if (this.hasViolations(summary)) {
+      console.warn("\n== ISSUES FOUND! ==\n");
+      if (summary.flaggedViolations) {
+        if (summary.rulesViolated) {
+          console.warn(
+            `Flagged Violations: ${summary.flaggedViolations} across ${summary.rulesViolated} rules`
+          );
+        } else {
+          console.warn(`Flagged Violations: ${summary.flaggedViolations}`);
+        }
       }
-    }
-    if (summary.assumedViolations) {
-      console.warn(`Assumed Violations: ${summary.assumedViolations}`);
-    }
-    if (summary.unresolvedReferences) {
-      console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
-    }
-    if (!preserveDefinitions && summary.unreferencedObjects) {
-      console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
+      if (summary.assumedViolations) {
+        console.warn(`Assumed Violations: ${summary.assumedViolations}`);
+      }
+      if (summary.unresolvedReferences) {
+        console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
+      }
+      if (!preserveDefinitions && summary.unreferencedObjects) {
+        console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
+      }
+    } else {
+      console.info(`\n== NO ISSUES FOUND! ==\n`);
     }
     console.warn("\n");
     console.warn(
