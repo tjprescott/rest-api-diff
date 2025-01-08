@@ -10,6 +10,7 @@ against the one generated from TypeSpec to determine if the TypeSpec accurately 
 2. If you want to make use of TypeSpec compilation features, `npm install @typespec/compiler`
 
 ## Usage
+
 1. Run `npx rest-api-diff --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp] [--group-violations]` or `npx rest-api-diff` if you are using a `.env` file (Recommended)
 
 ## Dev Install
@@ -21,7 +22,7 @@ against the one generated from TypeSpec to determine if the TypeSpec accurately 
 ## Dev Usage
 
 1. Run `npm run build` to build the tool. Alternatively, run `npm run watch` in a separate terminal so that changes to the TypeScript files are automatically re-compiled (RECOMMENDED).
-2. Run `npm run diff -- --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp] [--group-violations]` or `npm run diff` if you are using a `.env` file (Recommended)
+2. Run `npm run rest-api-diff -- --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp] [--group-violations]` or `npm run rest-api-diff` if you are using a `.env` file (Recommended)
 
 `lhs_path` and `rhs_path` are the paths to the Swagger specifications to compare, or the folders
 containing them. If the paths are folders, the tool will search for all Swagger files in that folder,
