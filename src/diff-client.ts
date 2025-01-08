@@ -285,15 +285,19 @@ export class DiffClient {
     );
     // Report unresolved and unreferenced objects
     if (this.args["verbose"]) {
-      console.warn("=== LEFT-HAND SIDE ===");
-      this.#reportUnresolvedReferences(this.lhsParser);
-      if (!this.args["preserve-definitions"]) {
-        this.#reportUnreferencedObjects(this.lhsParser);
+      if (this.lhsParser.getUnreferencedTotal() > 0) {
+        console.warn("=== LEFT-HAND SIDE ===");
+        this.#reportUnresolvedReferences(this.lhsParser);
+        if (!this.args["preserve-definitions"]) {
+          this.#reportUnreferencedObjects(this.lhsParser);
+        }
       }
-      console.warn("\n=== RIGHT-HAND SIDE ===");
-      this.#reportUnresolvedReferences(this.rhsParser);
-      if (!this.args["preserve-definitions"]) {
-        this.#reportUnreferencedObjects(this.rhsParser);
+      if (this.rhsParser.getUnreferencedTotal() > 0) {
+        console.warn("\n=== RIGHT-HAND SIDE ===");
+        this.#reportUnresolvedReferences(this.rhsParser);
+        if (!this.args["preserve-definitions"]) {
+          this.#reportUnreferencedObjects(this.rhsParser);
+        }
       }
     }
     const groupViolations = this.args["group-violations"];

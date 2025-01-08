@@ -3,6 +3,7 @@
 ## 0.1.9 (TBD)
 
 - Add rule to better ignore diffs in `x-ms-examples`.
+- Do not flag `common-types` as unreferenced.
 - Fix output so if no violations are found, it states that.
 
 ## 0.1.8 (2025-01-08)
