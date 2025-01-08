@@ -1,6 +1,6 @@
 # @azure-tools/rest-api-diff
 
-## 0.1.8 (TBD)
+## 0.1.8 (2025-01-08)
 
 - Rule application logic changed such that a flagged rule continues to run rules in case
   there is a rule that markes it as NoViolation. If I diff is determined to be NoViolation,
