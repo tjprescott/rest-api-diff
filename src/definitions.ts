@@ -32,7 +32,10 @@ class CollectionRegistry {
         for (const [name, _] of toSorted(Object.entries(subdata))) {
           const resolvedPath = getResolvedPath(filepath).replace(/\\/g, "/");
           const pathKey = `${resolvedPath}#/${this.getRegistryName()}/${name}`;
-          this.unreferenced.add(pathKey);
+          // we don't care about unreferenced common-types
+          if (!resolvedPath.includes("common-types")) {
+            this.unreferenced.add(pathKey);
+          }
         }
       }
     }
