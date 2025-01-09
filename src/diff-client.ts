@@ -216,13 +216,22 @@ export class DiffClient {
     };
   }
 
-  hasViolations(summary: ResultSummary): boolean {
-    return (
-      summary.flaggedViolations > 0 ||
-      summary.assumedViolations > 0 ||
-      summary.unresolvedReferences > 0 ||
-      summary.unreferencedObjects > 0
-    );
+  /** Returns true if the summary indicates that there are violations. */
+  hasViolations(summary: ResultSummary, preserveDefinitions: boolean): boolean {
+    if (preserveDefinitions) {
+      return (
+        summary.flaggedViolations > 0 ||
+        summary.assumedViolations > 0 ||
+        summary.unresolvedReferences > 0
+      );
+    } else {
+      return (
+        summary.flaggedViolations > 0 ||
+        summary.assumedViolations > 0 ||
+        summary.unresolvedReferences > 0 ||
+        summary.unreferencedObjects > 0
+      );
+    }
   }
 
   /** Write results to output files and print summary to console. */
@@ -283,19 +292,33 @@ export class DiffClient {
       path.join(outputFolder, "rhs.json"),
       JSON.stringify(results.normal[1], null, 2)
     );
+    const preserveDefinitions = this.args["preserve-definitions"];
+
     // Report unresolved and unreferenced objects
     if (this.args["verbose"]) {
-      if (this.lhsParser.getUnreferencedTotal() > 0) {
+      const lhsUnreferenced = preserveDefinitions
+        ? 0
+        : this.lhsParser.getUnreferencedTotal();
+      const lhsUnresolved = this.lhsParser.getUnresolvedReferences().length;
+      if (lhsUnresolved > 0 || lhsUnreferenced > 0) {
         console.warn("=== LEFT-HAND SIDE ===");
-        this.#reportUnresolvedReferences(this.lhsParser);
-        if (!this.args["preserve-definitions"]) {
+        if (lhsUnresolved > 0) {
+          this.#reportUnresolvedReferences(this.lhsParser);
+        }
+        if (lhsUnreferenced > 0) {
           this.#reportUnreferencedObjects(this.lhsParser);
         }
       }
-      if (this.rhsParser.getUnreferencedTotal() > 0) {
+      const rhsUnreferenced = preserveDefinitions
+        ? 0
+        : this.rhsParser.getUnreferencedTotal();
+      const rhsUnresolved = this.rhsParser.getUnresolvedReferences().length;
+      if (rhsUnresolved > 0 || rhsUnreferenced > 0) {
         console.warn("\n=== RIGHT-HAND SIDE ===");
-        this.#reportUnresolvedReferences(this.rhsParser);
-        if (!this.args["preserve-definitions"]) {
+        if (rhsUnresolved > 0) {
+          this.#reportUnresolvedReferences(this.rhsParser);
+        }
+        if (rhsUnreferenced > 0) {
           this.#reportUnreferencedObjects(this.rhsParser);
         }
       }
@@ -335,8 +358,7 @@ export class DiffClient {
       unreferencedObjects: this.rhsParser.getUnreferencedTotal(),
     };
 
-    const preserveDefinitions = this.args["preserve-definitions"];
-    if (this.hasViolations(summary)) {
+    if (this.hasViolations(summary, preserveDefinitions)) {
       console.warn("\n== ISSUES FOUND! ==\n");
       if (summary.flaggedViolations) {
         if (summary.rulesViolated) {
@@ -356,32 +378,31 @@ export class DiffClient {
       if (!preserveDefinitions && summary.unreferencedObjects) {
         console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
       }
+      console.warn("\n");
+      console.warn(
+        `See '${outputFolder}' for details. See 'lhs.json', 'rhs.json' and 'diff.json'.`
+      );
+      if (!preserveDefinitions && summary.unreferencedObjects) {
+        console.warn(
+          "Running with `--preserve-defintions` will ensure those unreferenced objects are diffed and will not report the fact that they are unreferenced as a violation."
+        );
+        if (!this.args["verbose"]) {
+          console.warn(
+            "or run with `--verbose` to see more detailed information."
+          );
+        }
+      }
     } else {
       console.info(`\n== NO ISSUES FOUND! ==\n`);
-    }
-    console.warn("\n");
-    console.warn(
-      `See '${outputFolder}' for details. See 'lhs.json', 'rhs.json' and 'diff.json'.`
-    );
-    if (
-      !preserveDefinitions &&
-      (summary.unresolvedReferences || summary.unreferencedObjects)
-    ) {
-      console.warn(
-        "Try running with `--preserve-defintions` to include unreferenced definitions in the comparison"
-      );
-      if (!this.args["verbose"]) {
-        console.warn(
-          "or run with `--verbose` to see more detailed information."
+      console.info("\n");
+      if (summary.unreferencedObjects > 0 && preserveDefinitions) {
+        console.info(
+          `Note that there were ${summary.unreferencedObjects} unreferenced objects found, but the simple fact that are unreferenced is not considered a violation because you used '--preserve-definitions'.\n`
         );
       }
-    }
-  }
-
-  /** Logs a message to console if --verbose is set. */
-  #logIfVerbose(message: string) {
-    if (this.args["verbose"]) {
-      console.log(message);
+      console.info(
+        `See '${outputFolder}' for details. You may still want to compare 'lhs-inv.json' and 'rhs-inv.json' to check that the differences reflected are truly irrelevant.`
+      );
     }
   }
 

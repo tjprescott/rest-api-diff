@@ -4,7 +4,7 @@
 
 - Add rule to better ignore diffs in `x-ms-examples`.
 - Do not flag `common-types` as unreferenced.
-- Fix output so if no violations are found, it states that.
+- Clean up output for accuracy and readability.
 
 ## 0.1.8 (2025-01-08)
 
