@@ -3,6 +3,7 @@
 ## 0.1.9 (TBD)
 
 - Add rule to better ignore diffs in `x-ms-examples`.
+- Add rule to flag the addition or removal of paths as a violation.
 - Do not flag `common-types` as unreferenced.
 - Clean up output for accuracy and readability.
 
