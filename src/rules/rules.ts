@@ -16,6 +16,8 @@ import { compareXMsIdentifiersRule } from "./compare-x-ms-identifiers.js";
 import { ignoreXMsExamplesRule } from "./ignore-x-ms-examples.js";
 import { pathAddedRule } from "./path-added.js";
 import { pathRemovedRule } from "./path-removed.js";
+import { responseAddedRule } from "./response-added.js";
+import { responseRemovedRule } from "./response-removed.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -51,6 +53,8 @@ export function getApplicableRules(args: any): RuleSignature[] {
     compareRequestRequiredRule,
     pathAddedRule,
     pathRemovedRule,
+    responseAddedRule,
+    responseRemovedRule,
   ];
 
   const preserveDefinitions = args["preserve-definitions"];
