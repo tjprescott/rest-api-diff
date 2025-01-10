@@ -348,12 +348,21 @@ export class DiffClient {
     }
 
     // add up the length of each array
+    const flaggedRulesViolated = new Set(
+      allViolations
+        .filter((x) => x.ruleName && !x.ruleName.endsWith("(AUTO)"))
+        .map((x) => x.ruleName)
+    );
+    const assumedRulesViolated = new Set(
+      allViolations
+        .filter((x) => x.ruleName && x.ruleName.endsWith("(AUTO)"))
+        .map((x) => x.ruleName)
+    );
     const summary: ResultSummary = {
       flaggedViolations: this.diffResults.flaggedViolations.length,
       assumedViolations: this.diffResults.assumedViolations.length,
-      rulesViolated: groupViolations
-        ? new Set(allViolations.map((x) => x.ruleName)).size
-        : undefined,
+      assumedRules: groupViolations ? assumedRulesViolated.size : undefined,
+      rulesViolated: groupViolations ? flaggedRulesViolated.size : undefined,
       unresolvedReferences: this.rhsParser.getUnresolvedReferences().length,
       unreferencedObjects: this.rhsParser.getUnreferencedTotal(),
     };
@@ -370,7 +379,13 @@ export class DiffClient {
         }
       }
       if (summary.assumedViolations) {
-        console.warn(`Assumed Violations: ${summary.assumedViolations}`);
+        if (summary.assumedRules) {
+          console.warn(
+            `Assumed Violations: ${summary.assumedViolations} across ${summary.assumedRules} auto-generated groupings`
+          );
+        } else {
+          console.warn(`Assumed Violations: ${summary.assumedViolations}`);
+        }
       }
       if (summary.unresolvedReferences) {
         console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
@@ -566,17 +581,17 @@ export class DiffClient {
     }
     const groupedDiff: { [key: string]: DiffGroupingResult } = {};
     for (const diff of diffs) {
-      const ruleName =
+      diff.ruleName =
         diff.ruleName ?? this.#buildDefaultRuleName(diff.diff, diff.diff.path);
-      if (!groupedDiff[ruleName]) {
-        groupedDiff[ruleName] = {
-          name: ruleName,
+      if (!groupedDiff[diff.ruleName]) {
+        groupedDiff[diff.ruleName] = {
+          name: diff.ruleName,
           count: 0,
           items: [],
         };
       }
-      groupedDiff[ruleName]!.items.push(diff);
-      groupedDiff[ruleName]!.count++;
+      groupedDiff[diff.ruleName]!.items.push(diff);
+      groupedDiff[diff.ruleName]!.count++;
     }
     const finalResults = new Map<string, any>();
     // Sort by count descending
@@ -645,6 +660,7 @@ interface ResultSummary {
   flaggedViolations: number;
   rulesViolated: number | undefined;
   assumedViolations: number;
+  assumedRules: number | undefined;
   unresolvedReferences: number;
   unreferencedObjects: number;
 }
