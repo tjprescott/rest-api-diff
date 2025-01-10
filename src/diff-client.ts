@@ -516,14 +516,58 @@ export class DiffClient {
     }
   }
 
+  #diffKindToString(diff: Diff<any, any>): string {
+    switch (diff.kind) {
+      case "E":
+        return "Changed";
+      case "N":
+        return "Added";
+      case "D":
+        return "Removed";
+      case "A":
+        return "ArrayItem";
+    }
+  }
+
+  /**
+   * Constructs a default rule name based on the diff kind and path to
+   * aid with grouping diffs which aren't subject to any format rule.
+   */
+  #buildDefaultRuleName(
+    diff: Diff<any, any>,
+    path: Array<String> | undefined
+  ): string {
+    if (!path) {
+      throw new Error("Unexpected undefined path");
+    }
+    const verb = this.#diffKindToString(diff);
+    let returnValue = "UNGROUPED";
+    if (diff.kind === "A") {
+      const arrayItemRuleName = this.#buildDefaultRuleName(
+        diff.item,
+        diff.path
+      );
+      returnValue = `${verb}_${arrayItemRuleName}`;
+    } else {
+      const lastPath = path[path.length - 1];
+      if (typeof lastPath === "number") {
+        const secondToLastPath = path[path.length - 2];
+        return `${verb}_${secondToLastPath} (AUTO)`;
+      } else {
+        return `${verb}_${lastPath} (AUTO)`;
+      }
+    }
+    return returnValue;
+  }
+
   #buildDiffFile(diffs: DiffItem[]): any {
     if (!this.args["group-violations"]) {
       return diffs;
     }
-    const defaultRule = "UNGROUPED";
     const groupedDiff: { [key: string]: DiffGroupingResult } = {};
     for (const diff of diffs) {
-      const ruleName = diff.ruleName ?? defaultRule;
+      const ruleName =
+        diff.ruleName ?? this.#buildDefaultRuleName(diff.diff, diff.diff.path);
       if (!groupedDiff[ruleName]) {
         groupedDiff[ruleName] = {
           name: ruleName,
