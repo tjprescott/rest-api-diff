@@ -49,6 +49,8 @@ but will not search subfolders.
   which exist solely for code re-use, aren't relevant to that question unless those definitions are used
   with a request or response. Hence, they are, by defult, pruned from the output. If you want to preserve
   these, for example to compare the definitions themselves between two Swaggers, provide this flag.
+- `--flatten-paths`: The default format of paths in the output is an array of path segments. If you prefer
+  to flatten these into a forward-slash delimited string, provide this flag.
 
 ### .env File
 

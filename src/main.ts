@@ -45,6 +45,12 @@ const args = await yargs(hideBin(process.argv))
     describe: "The folder to output artifacts to.",
     default: process.env.OUTPUT_FOLDER ?? "./output",
   })
+  .options("flatten-paths", {
+    type: "boolean",
+    describe:
+      "Flatten paths in the output from an array of segments to a single line.",
+    default: process.env.FLATTEN_PATHS,
+  })
   .options("typespec-compiler-path", {
     type: "string",
     describe:

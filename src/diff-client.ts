@@ -203,6 +203,9 @@ export class DiffClient {
     const assumedViolations = this.diffResults.assumedViolations ?? [];
     const allViolations = [...flaggedViolations, ...assumedViolations];
 
+    const diffResult = this.#buildDiffFile(allViolations);
+    const invDiffResult = this.#buildDiffFile(this.diffResults.noViolations);
+
     this.resultFiles = {
       raw: [this.lhs, this.rhs],
       normal: this.#pruneDocuments(
@@ -211,8 +214,8 @@ export class DiffClient {
         this.diffResults.noViolations
       ),
       inverse: this.#pruneDocuments(this.lhs, this.rhs, allViolations),
-      diff: this.#buildDiffFile(allViolations),
-      diffInverse: this.#buildDiffFile(this.diffResults.noViolations),
+      diff: diffResult,
+      diffInverse: invDiffResult,
     };
   }
 
@@ -577,7 +580,7 @@ export class DiffClient {
 
   #buildDiffFile(diffs: DiffItem[]): any {
     if (!this.args["group-violations"]) {
-      return diffs;
+      return this.#flattenPaths(diffs);
     }
     const groupedDiff: { [key: string]: DiffGroupingResult } = {};
     for (const diff of diffs) {
@@ -599,6 +602,7 @@ export class DiffClient {
     for (const item of sorted) {
       const name = item.name!;
       delete item.name;
+      item.items = this.#flattenPaths(item.items);
       finalResults.set(name, item);
     }
     return finalResults;
@@ -623,6 +627,26 @@ export class DiffClient {
         );
       }
     }
+  }
+
+  #flattenPaths(items: DiffItem[]): any[] {
+    if (!this.args["flatten-paths"]) {
+      return items;
+    }
+    const results: any[] = [];
+    for (const item of items) {
+      const allItem = { ...item };
+      const diff = { ...allItem.diff };
+      const path = diff.path;
+      // join and url-encode the path segments
+      const fullPath = path!
+        .map((x: string) => encodeURIComponent(x))
+        .join("/");
+      (diff as any).path = fullPath;
+      allItem.diff = diff;
+      results.push(allItem);
+    }
+    return results;
   }
 }
 
