@@ -37,7 +37,7 @@ const args = await yargs(hideBin(process.argv))
   .options("group-violations", {
     type: "boolean",
     describe:
-      "Group violations by rule name. If false, will output all violations in a flat collection.",
+      "Group violations by rule name. Assumed violations will be grouped into generated groups with the '(AUTO)' suffix. Otherwise, will output all violations in a flat collection.",
     default: process.env.GROUP_VIOLATIONS,
   })
   .options("output-folder", {
