@@ -2,8 +2,10 @@
 
 ## 0.1.9 (TBD)
 
+- Using `--group-violations` will auto-generate groupings.
 - Add rule to better ignore diffs in `x-ms-examples`.
 - Add rule to flag the addition or removal of paths or responses as a violation.
+- Add rule to better ignore top-level and operation-level tags, but not property tags.
 - Do not flag `common-types` as unreferenced.
 - Clean up output for accuracy and readability.
 

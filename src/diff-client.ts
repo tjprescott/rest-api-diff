@@ -348,12 +348,21 @@ export class DiffClient {
     }
 
     // add up the length of each array
+    const flaggedRulesViolated = new Set(
+      allViolations
+        .filter((x) => x.ruleName && !x.ruleName.endsWith("(AUTO)"))
+        .map((x) => x.ruleName)
+    );
+    const assumedRulesViolated = new Set(
+      allViolations
+        .filter((x) => x.ruleName && x.ruleName.endsWith("(AUTO)"))
+        .map((x) => x.ruleName)
+    );
     const summary: ResultSummary = {
       flaggedViolations: this.diffResults.flaggedViolations.length,
       assumedViolations: this.diffResults.assumedViolations.length,
-      rulesViolated: groupViolations
-        ? new Set(allViolations.map((x) => x.ruleName)).size
-        : undefined,
+      assumedRules: groupViolations ? assumedRulesViolated.size : undefined,
+      rulesViolated: groupViolations ? flaggedRulesViolated.size : undefined,
       unresolvedReferences: this.rhsParser.getUnresolvedReferences().length,
       unreferencedObjects: this.rhsParser.getUnreferencedTotal(),
     };
@@ -370,7 +379,13 @@ export class DiffClient {
         }
       }
       if (summary.assumedViolations) {
-        console.warn(`Assumed Violations: ${summary.assumedViolations}`);
+        if (summary.assumedRules) {
+          console.warn(
+            `Assumed Violations: ${summary.assumedViolations} across ${summary.assumedRules} auto-generated groupings`
+          );
+        } else {
+          console.warn(`Assumed Violations: ${summary.assumedViolations}`);
+        }
       }
       if (summary.unresolvedReferences) {
         console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
@@ -516,23 +531,67 @@ export class DiffClient {
     }
   }
 
+  #diffKindToString(diff: Diff<any, any>): string {
+    switch (diff.kind) {
+      case "E":
+        return "Changed";
+      case "N":
+        return "Added";
+      case "D":
+        return "Removed";
+      case "A":
+        return "ArrayItem";
+    }
+  }
+
+  /**
+   * Constructs a default rule name based on the diff kind and path to
+   * aid with grouping diffs which aren't subject to any format rule.
+   */
+  #buildDefaultRuleName(
+    diff: Diff<any, any>,
+    path: Array<String> | undefined
+  ): string {
+    if (!path) {
+      throw new Error("Unexpected undefined path");
+    }
+    const verb = this.#diffKindToString(diff);
+    let returnValue = "UNGROUPED";
+    if (diff.kind === "A") {
+      const arrayItemRuleName = this.#buildDefaultRuleName(
+        diff.item,
+        diff.path
+      );
+      returnValue = `${verb}_${arrayItemRuleName}`;
+    } else {
+      const lastPath = path[path.length - 1];
+      if (typeof lastPath === "number") {
+        const secondToLastPath = path[path.length - 2];
+        return `${verb}_${secondToLastPath} (AUTO)`;
+      } else {
+        return `${verb}_${lastPath} (AUTO)`;
+      }
+    }
+    return returnValue;
+  }
+
   #buildDiffFile(diffs: DiffItem[]): any {
     if (!this.args["group-violations"]) {
       return diffs;
     }
-    const defaultRule = "UNGROUPED";
     const groupedDiff: { [key: string]: DiffGroupingResult } = {};
     for (const diff of diffs) {
-      const ruleName = diff.ruleName ?? defaultRule;
-      if (!groupedDiff[ruleName]) {
-        groupedDiff[ruleName] = {
-          name: ruleName,
+      diff.ruleName =
+        diff.ruleName ?? this.#buildDefaultRuleName(diff.diff, diff.diff.path);
+      if (!groupedDiff[diff.ruleName]) {
+        groupedDiff[diff.ruleName] = {
+          name: diff.ruleName,
           count: 0,
           items: [],
         };
       }
-      groupedDiff[ruleName]!.items.push(diff);
-      groupedDiff[ruleName]!.count++;
+      groupedDiff[diff.ruleName]!.items.push(diff);
+      groupedDiff[diff.ruleName]!.count++;
     }
     const finalResults = new Map<string, any>();
     // Sort by count descending
@@ -601,6 +660,7 @@ interface ResultSummary {
   flaggedViolations: number;
   rulesViolated: number | undefined;
   assumedViolations: number;
+  assumedRules: number | undefined;
   unresolvedReferences: number;
   unreferencedObjects: number;
 }

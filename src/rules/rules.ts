@@ -18,6 +18,7 @@ import { pathAddedRule } from "./path-added.js";
 import { pathRemovedRule } from "./path-removed.js";
 import { responseAddedRule } from "./response-added.js";
 import { responseRemovedRule } from "./response-removed.js";
+import { ignoreTagsRule } from "./ignore-tags.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -55,6 +56,7 @@ export function getApplicableRules(args: any): RuleSignature[] {
     pathRemovedRule,
     responseAddedRule,
     responseRemovedRule,
+    ignoreTagsRule,
   ];
 
   const preserveDefinitions = args["preserve-definitions"];
