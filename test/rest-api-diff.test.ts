@@ -53,6 +53,55 @@ it("config should group violations when --group-violations is set", async () => 
   }
 });
 
+it("config should flatten paths when --flatten-paths is set", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
+  const args = { "flatten-paths": true, "output-folder": tempDir };
+  const config: DiffClientConfig = {
+    lhs: ["test/files/test2a.json"],
+    rhs: ["test/files/test2b.json"],
+    args: args,
+    rules: getApplicableRules(args),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  client.writeOutput();
+
+  const diffPath = path.join(tempDir, "diff.json");
+  const items = JSON.parse(fs.readFileSync(diffPath, "utf8"));
+  expect(items[0].diff.path).toEqual(
+    "paths/%20%/get/responses/200/schema/properties/age/format"
+  );
+});
+
+it("config should flatten paths when --flatten-paths and --group-violations is set", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
+  const args = {
+    "flatten-paths": true,
+    "group-violations": true,
+    "output-folder": tempDir,
+  };
+  const config: DiffClientConfig = {
+    lhs: ["test/files/test2a.json"],
+    rhs: ["test/files/test2b.json"],
+    args: args,
+    rules: getApplicableRules(args),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  client.writeOutput();
+
+  const diffPath = path.join(tempDir, "diff.json");
+  const diffFile = JSON.parse(fs.readFileSync(diffPath, "utf8"));
+  const items = diffFile["Changed_format (AUTO)"];
+  expect(items[0].diff.path).toEqual(
+    "paths/%20%/get/responses/200/schema/properties/age/format"
+  );
+});
+
 it("config should not group violations when --group-violations is not set", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
   const args = { "output-folder": tempDir };

@@ -203,10 +203,8 @@ export class DiffClient {
     const assumedViolations = this.diffResults.assumedViolations ?? [];
     const allViolations = [...flaggedViolations, ...assumedViolations];
 
-    const diffResult = this.#buildDiffFile(convertDiffItems(allViolations));
-    const invDiffResult = this.#buildDiffFile(
-      convertDiffItems(this.diffResults.noViolations)
-    );
+    const diffResult = this.#buildDiffFile(allViolations);
+    const invDiffResult = this.#buildDiffFile(this.diffResults.noViolations);
 
     this.resultFiles = {
       raw: [this.lhs, this.rhs],
