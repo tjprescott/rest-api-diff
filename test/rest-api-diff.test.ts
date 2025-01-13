@@ -71,7 +71,7 @@ it("config should flatten paths when --flatten-paths is set", async () => {
   const diffPath = path.join(tempDir, "diff.json");
   const items = JSON.parse(fs.readFileSync(diffPath, "utf8"));
   expect(items[0].diff.path).toEqual(
-    "paths/%20%/get/responses/200/schema/properties/age/format"
+    "paths/%2F/get/responses/200/schema/properties/age/format"
   );
 });
 
@@ -96,9 +96,9 @@ it("config should flatten paths when --flatten-paths and --group-violations is s
 
   const diffPath = path.join(tempDir, "diff.json");
   const diffFile = JSON.parse(fs.readFileSync(diffPath, "utf8"));
-  const items = diffFile["Changed_format (AUTO)"];
+  const items = diffFile["Changed_format (AUTO)"].items;
   expect(items[0].diff.path).toEqual(
-    "paths/%20%/get/responses/200/schema/properties/age/format"
+    "paths/%2F/get/responses/200/schema/properties/age/format"
   );
 });
 
