@@ -3,6 +3,7 @@
 ## 0.1.9 (TBD)
 
 - Using `--group-violations` will auto-generate groupings.
+- Added `--flatten-paths` option to allowing flattening paths in the output to compress vertical space.
 - Add rule to better ignore diffs in `x-ms-examples`.
 - Add rule to flag the addition or removal of paths or responses as a violation.
 - Add rule to better ignore top-level and operation-level tags, but not property tags.
