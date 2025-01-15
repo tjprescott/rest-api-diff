@@ -28,6 +28,8 @@ export enum RuleResult {
   AssumedViolation = "A",
   /** Rule applies and verifies this is not a violation. Stop processing other rules for this diff. */
   NoViolation = "N",
+  /** Rule was a flagged or assumed violation, but manually suppressed. */
+  Suppressed = "S",
 }
 
 export type RuleSignature = (
