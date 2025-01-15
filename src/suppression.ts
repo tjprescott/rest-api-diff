@@ -39,7 +39,8 @@ export class SuppressionRegistry {
   has(path: string | undefined): boolean {
     if (!path) return false;
     path = path.trim().toLowerCase();
-    return this.data.has(path);
+    const value = this.data.has(path);
+    return value;
   }
 
   propagateSuppression(ref: ReferenceMetadata, basePath: string[] | undefined) {

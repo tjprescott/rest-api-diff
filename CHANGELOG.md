@@ -1,5 +1,9 @@
 # @azure-tools/rest-api-diff
 
+## 0.2.2 (TBD)
+
+- Stuff
+
 ## 0.2.1 (2025-04-09)
 
 - Added `--suppressions` option to point to a file containing point suppressions of violations.

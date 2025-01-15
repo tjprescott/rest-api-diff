@@ -14,10 +14,7 @@ export function compareXMsEnumRule(
   if (!match) return;
   const property = match[1];
   if (property === "modelAsString") {
-    const lhs = (data as any).lhs ?? "undefined";
-    const rhs = (data as any).rhs ?? "undefined";
-    const message = `x-ms-enum.modelAsString changed from '${lhs}' to '${rhs}'.`;
-    return [RuleResult.FlaggedViolation, message];
+    return RuleResult.FlaggedViolation;
   } else {
     return RuleResult.NoViolation;
   }
