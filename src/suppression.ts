@@ -1,11 +1,11 @@
-export class SuppressionManager {
+export class SuppressionRegistry {
   flatList = new Set<string>();
   data: Map<string, string[]>;
 
   constructor(paths: string[]) {
     this.data = new Map<string, string[]>();
     for (const path of paths) {
-      this.data.set(path, []);
+      this.data.set(path.toLowerCase(), []);
     }
   }
 
@@ -16,6 +16,8 @@ export class SuppressionManager {
    * @param path the transformed path to add to the suppression list
    */
   add(key: string, path: string) {
+    path = path.toLowerCase();
+    key = key.toLowerCase();
     const values = this.data.get(key);
     if (!values) return;
     values.push(path);
@@ -28,6 +30,7 @@ export class SuppressionManager {
    * @param path The transformed path to check for suppression
    */
   has(path: string): boolean {
+    path = path.toLowerCase();
     return this.flatList.has(path);
   }
 }
