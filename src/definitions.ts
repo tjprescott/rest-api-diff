@@ -6,7 +6,9 @@ import {
   ReferenceMetadata,
   toSorted,
 } from "./util.js";
+import * as fs from "fs";
 import path from "path";
+import { SuppressionRegistry } from "./suppression.js";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {
@@ -100,6 +102,7 @@ export class DefinitionRegistry {
   private referenceStack: string[] = [];
   private referenceMap = new Map<string, Set<string>>();
   private currentPath: string | undefined;
+  private suppressions = new SuppressionRegistry([]);
   private args: any;
 
   constructor(map: Map<string, OpenAPIV2.Document>, args: any) {
@@ -131,6 +134,12 @@ export class DefinitionRegistry {
     this.currentPath;
     this.#gatherDefinitions(map);
     this.args = args;
+    if (args["suppressions"]) {
+      const suppressPaths = fs
+        .readFileSync(args["suppressions"], "utf8")
+        .split("\n");
+      this.suppressions = new SuppressionRegistry(suppressPaths);
+    }
     this.#expandReferences();
   }
 
@@ -300,7 +309,10 @@ export class DefinitionRegistry {
     }
   }
 
-  #expandReferencesForCollection(collection: CollectionRegistry) {
+  #expandReferencesForCollection(
+    collection: CollectionRegistry,
+    swaggerKey: string
+  ) {
     this.referenceStack = [];
     for (const [path, values] of collection.data.entries()) {
       this.currentPath = path;
@@ -319,10 +331,13 @@ export class DefinitionRegistry {
   }
 
   #expandReferences() {
-    this.#expandReferencesForCollection(this.data.definitions);
-    this.#expandReferencesForCollection(this.data.parameters);
-    this.#expandReferencesForCollection(this.data.responses);
-    this.#expandReferencesForCollection(this.data.securityDefinitions);
+    this.#expandReferencesForCollection(this.data.definitions, "definitions");
+    this.#expandReferencesForCollection(this.data.parameters, "parameters");
+    this.#expandReferencesForCollection(this.data.responses, "responses");
+    this.#expandReferencesForCollection(
+      this.data.securityDefinitions,
+      "securityDefinitions"
+    );
   }
 
   /**
