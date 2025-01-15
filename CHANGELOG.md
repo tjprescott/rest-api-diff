@@ -2,7 +2,7 @@
 
 ## 0.2.1 (TBD)
 
-- Added `--suppressions` option to point to a filing containing point suppressions of violations.
+- Added `--suppressions` option to point to a file containing point suppressions of violations.
 
 ## 0.2.0 (2025-03-11)
 
