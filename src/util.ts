@@ -418,3 +418,13 @@ export function toSorted<T>(
 ): T[] {
   return [...array].sort(compareFn);
 }
+
+/**
+ * Convert path segments into a flatted, URL-encoded path string.
+ */
+export function getUrlEncodedPath(
+  segments: string[] | undefined
+): string | undefined {
+  if (segments === undefined) return undefined;
+  return segments.map((x: string) => encodeURIComponent(x)).join("/");
+}

@@ -6,12 +6,13 @@ import {
   RuleResult,
   RuleSignature,
 } from "./rules/rules.js";
-import { forceArray } from "./util.js";
+import { forceArray, getUrlEncodedPath } from "./util.js";
 import { OpenAPIV2 } from "openapi-types";
 import assert from "assert";
 import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";
 import path from "path";
+import { SuppressionRegistry } from "./suppression.js";
 
 export interface DiffClientConfig {
   lhs: string | string[];
@@ -25,6 +26,7 @@ export class DiffClient {
   private rules: RuleSignature[];
   private lhsParser?: SwaggerParser;
   private rhsParser?: SwaggerParser;
+  private suppressions = new SuppressionRegistry([]);
   /** Tracks if shortenKeys has been called to avoid re-running the algorithm needlessly. */
   private keysShortened: boolean = false;
 
@@ -63,6 +65,12 @@ export class DiffClient {
     }
     const lhsParser = await SwaggerParser.create(lhs, lhsRoot, client);
     const rhsParser = await SwaggerParser.create(rhs, rhsRoot, client);
+    if (client.args["suppressions"]) {
+      const suppressionEntries = fs
+        .readFileSync(client.args["suppressions"], "utf8")
+        .split("\n");
+      client.suppressions = new SuppressionRegistry(suppressionEntries);
+    }
     client.lhsParser = lhsParser;
     client.rhsParser = rhsParser;
     return client;
@@ -170,6 +178,7 @@ export class DiffClient {
       flaggedViolations: [],
       assumedViolations: [],
       noViolations: [],
+      suppressedViolations: [],
     };
     for (const diffItem of diffs ?? []) {
       const result = this.processRules(diffItem, lhs, rhs);
@@ -183,6 +192,9 @@ export class DiffClient {
         case RuleResult.NoViolation:
           results.noViolations.push(result);
           break;
+        case RuleResult.Suppressed:
+          results.suppressedViolations.push(result);
+          break;
         default:
           throw new Error(`Unexpected result ${result}`);
       }
@@ -190,7 +202,8 @@ export class DiffClient {
     const resultTotal =
       results.flaggedViolations.length +
       results.assumedViolations.length +
-      results.noViolations.length;
+      results.noViolations.length +
+      results.suppressedViolations.length;
     assert(
       resultTotal === diffs.length,
       `Expected ${diffs.length} results, but got ${resultTotal}`
@@ -235,6 +248,26 @@ export class DiffClient {
         break;
       }
     }
+
+    // if a violation is suppressed, keep metadata the same but change it from a
+    // flagged or assumed violation to `RuleResult.Suppressed`.
+    const isSuppressed = this.suppressions.has(getUrlEncodedPath(data.path));
+    const finalRuleResult =
+      (Array.isArray(finalResult) ? finalResult[0] : finalResult) ??
+      RuleResult.AssumedViolation;
+    if (
+      [RuleResult.FlaggedViolation, RuleResult.AssumedViolation].includes(
+        finalRuleResult
+      ) &&
+      isSuppressed
+    ) {
+      if (Array.isArray(finalResult)) {
+        finalResult[0] = RuleResult.Suppressed;
+      } else {
+        finalResult = RuleResult.Suppressed;
+      }
+    }
+
     // now apply the final rule result
     if (finalResult && Array.isArray(finalResult)) {
       retVal.ruleResult = finalResult[0];
@@ -259,17 +292,17 @@ export class DiffClient {
     const flaggedViolations = this.diffResults.flaggedViolations ?? [];
     const assumedViolations = this.diffResults.assumedViolations ?? [];
     const allViolations = [...flaggedViolations, ...assumedViolations];
+    const ignoredViolations = [
+      ...this.diffResults.noViolations,
+      ...this.diffResults.suppressedViolations,
+    ];
 
     const diffResult = this.#buildDiffFile(allViolations);
-    const invDiffResult = this.#buildDiffFile(this.diffResults.noViolations);
+    const invDiffResult = this.#buildDiffFile(ignoredViolations);
 
     this.resultFiles = {
       raw: [this.lhs, this.rhs],
-      normal: this.#pruneDocuments(
-        this.lhs,
-        this.rhs,
-        this.diffResults.noViolations
-      ),
+      normal: this.#pruneDocuments(this.lhs, this.rhs, ignoredViolations),
       inverse: this.#pruneDocuments(this.lhs, this.rhs, allViolations),
       diff: diffResult,
       diffInverse: invDiffResult,
@@ -405,7 +438,10 @@ export class DiffClient {
     }
 
     // write the inverse diff file to the file system
-    if (this.diffResults.noViolations.length !== 0) {
+    if (
+      this.diffResults.noViolations.length !== 0 ||
+      this.diffResults.suppressedViolations.length !== 0
+    ) {
       const inversePath = path.join(outputFolder, "diff-inv.json");
       const data = groupViolations
         ? Object.fromEntries(results.diffInverse)
@@ -431,6 +467,7 @@ export class DiffClient {
       rulesViolated: groupViolations ? flaggedRulesViolated.size : undefined,
       unresolvedReferences: this.rhsParser.getUnresolvedReferences().length,
       unreferencedObjects: this.rhsParser.getUnreferencedTotal(),
+      suppressedViolations: this.diffResults.suppressedViolations.length,
     };
 
     if (this.hasViolations(summary, preserveDefinitions)) {
@@ -458,6 +495,9 @@ export class DiffClient {
       }
       if (!preserveDefinitions && summary.unreferencedObjects) {
         console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
+      }
+      if (summary.suppressedViolations) {
+        console.warn(`Suppressed Violations: ${summary.suppressedViolations}`);
       }
       console.warn("\n");
       console.warn(
@@ -701,10 +741,7 @@ export class DiffClient {
       const allItem = { ...item };
       const diff = { ...allItem.diff };
       const path = diff.path;
-      // join and url-encode the path segments
-      const fullPath = path!
-        .map((x: string) => encodeURIComponent(x))
-        .join("/");
+      const fullPath = getUrlEncodedPath(path);
       (diff as any).path = fullPath;
       allItem.diff = diff;
       results.push(allItem);
@@ -733,6 +770,7 @@ interface DiffResult {
   flaggedViolations: DiffItem[];
   assumedViolations: DiffItem[];
   noViolations: DiffItem[];
+  suppressedViolations: DiffItem[];
 }
 
 interface ResultFiles {
@@ -750,4 +788,5 @@ interface ResultSummary {
   assumedRules: number | undefined;
   unresolvedReferences: number;
   unreferencedObjects: number;
+  suppressedViolations: number;
 }

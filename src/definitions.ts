@@ -102,7 +102,6 @@ export class DefinitionRegistry {
   private referenceStack: string[] = [];
   private referenceMap = new Map<string, Set<string>>();
   private currentPath: string | undefined;
-  private suppressions = new SuppressionRegistry([]);
   private args: any;
 
   constructor(map: Map<string, OpenAPIV2.Document>, args: any) {
@@ -134,12 +133,6 @@ export class DefinitionRegistry {
     this.currentPath;
     this.#gatherDefinitions(map);
     this.args = args;
-    if (args["suppressions"]) {
-      const suppressPaths = fs
-        .readFileSync(args["suppressions"], "utf8")
-        .split("\n");
-      this.suppressions = new SuppressionRegistry(suppressPaths);
-    }
     this.#expandReferences();
   }
 
@@ -309,16 +302,13 @@ export class DefinitionRegistry {
     }
   }
 
-  #expandReferencesForCollection(
-    collection: CollectionRegistry,
-    swaggerKey: string
-  ) {
+  #expandReferencesForCollection(collection: CollectionRegistry) {
     this.referenceStack = [];
-    for (const [path, values] of collection.data.entries()) {
-      this.currentPath = path;
+    for (const [filepath, values] of collection.data.entries()) {
+      this.currentPath = filepath;
       for (const [key, value] of values.entries()) {
-        let expanded = this.#expand(value, key, path);
-        collection.data.get(path)!.set(key, expanded);
+        let expanded = this.#expand(value, key, filepath);
+        collection.data.get(filepath)!.set(key, expanded);
       }
     }
     // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
@@ -331,13 +321,10 @@ export class DefinitionRegistry {
   }
 
   #expandReferences() {
-    this.#expandReferencesForCollection(this.data.definitions, "definitions");
-    this.#expandReferencesForCollection(this.data.parameters, "parameters");
-    this.#expandReferencesForCollection(this.data.responses, "responses");
-    this.#expandReferencesForCollection(
-      this.data.securityDefinitions,
-      "securityDefinitions"
-    );
+    this.#expandReferencesForCollection(this.data.definitions);
+    this.#expandReferencesForCollection(this.data.parameters);
+    this.#expandReferencesForCollection(this.data.responses);
+    this.#expandReferencesForCollection(this.data.securityDefinitions);
   }
 
   /**

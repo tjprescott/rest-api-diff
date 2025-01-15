@@ -1,11 +1,11 @@
 export class SuppressionRegistry {
-  flatList = new Set<string>();
-  data: Map<string, string[]>;
+  data = new Set<string>();
 
   constructor(paths: string[]) {
-    this.data = new Map<string, string[]>();
-    for (const path of paths) {
-      this.data.set(path.toLowerCase(), []);
+    this.data = new Set<string>();
+    for (let path of paths) {
+      path = path.trim().toLowerCase();
+      this.data.add(path);
     }
   }
 
@@ -16,21 +16,18 @@ export class SuppressionRegistry {
    * @param path the transformed path to add to the suppression list
    */
   add(key: string, path: string) {
-    path = path.toLowerCase();
+    path = path.trim().toLowerCase();
     key = key.toLowerCase();
-    const values = this.data.get(key);
-    if (!values) return;
-    values.push(path);
-    this.flatList.add(path);
-    this.data.set(key, values);
+    this.data.add(path);
   }
 
   /**
    * Returns true if a transformed path is included in the suppression list.
    * @param path The transformed path to check for suppression
    */
-  has(path: string): boolean {
-    path = path.toLowerCase();
-    return this.flatList.has(path);
+  has(path: string | undefined): boolean {
+    if (!path) return false;
+    path = path.trim().toLowerCase();
+    return this.data.has(path);
   }
 }
