@@ -13,6 +13,7 @@ import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";
 import path from "path";
 import { SuppressionRegistry } from "./suppression.js";
+import { HtmlDiffClient } from "./html-diff.js";
 
 export interface DiffClientConfig {
   lhs: string | string[];
@@ -26,7 +27,7 @@ export class DiffClient {
   private rules: RuleSignature[];
   private lhsParser?: SwaggerParser;
   private rhsParser?: SwaggerParser;
-  private suppressions = new SuppressionRegistry([]);
+  private suppressions?: SuppressionRegistry;
   /** Tracks if shortenKeys has been called to avoid re-running the algorithm needlessly. */
   private keysShortened: boolean = false;
 
@@ -66,10 +67,9 @@ export class DiffClient {
     const lhsParser = await SwaggerParser.create(lhs, lhsRoot, client);
     const rhsParser = await SwaggerParser.create(rhs, rhsRoot, client);
     if (client.args["suppressions"]) {
-      const suppressionEntries = fs
-        .readFileSync(client.args["suppressions"], "utf8")
-        .split("\n");
-      client.suppressions = new SuppressionRegistry(suppressionEntries);
+      client.suppressions = new SuppressionRegistry(
+        client.args["suppressions"]
+      );
     }
     client.lhsParser = lhsParser;
     client.rhsParser = rhsParser;
@@ -372,6 +372,12 @@ export class DiffClient {
       path.join(outputFolder, "rhs-inv.json"),
       JSON.stringify(results.inverse[1], null, 2)
     );
+    const html = new HtmlDiffClient(
+      path.join(outputFolder, "lhs-inv.json"),
+      path.join(outputFolder, "rhs-inv.json")
+    );
+    html.writeOutput(path.join(outputFolder, "diff-inv.html"));
+
     // write the raw files to output for debugging purposes
     fs.writeFileSync(
       path.join(outputFolder, "lhs-raw.json"),

@@ -1,10 +1,19 @@
+import * as fs from "fs";
+import { parse } from "yaml";
+
+export interface SuppressionMetadata {
+  path: string;
+  reason: string;
+}
+
 export class SuppressionRegistry {
   data = new Set<string>();
 
-  constructor(paths: string[]) {
-    this.data = new Set<string>();
-    for (let path of paths) {
-      path = path.trim().toLowerCase();
+  constructor(filepath: string) {
+    const contents = fs.readFileSync(filepath, "utf8");
+    const data: SuppressionMetadata[] = parse(contents);
+    for (const item of data) {
+      let path = item.path.trim().toLowerCase();
       this.data.add(path);
     }
   }

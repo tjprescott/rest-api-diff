@@ -1,2 +1,0 @@
-definitions/Foo/properties/age/format
-paths/%2F/get/responses/200/schema/properties/age/format
