@@ -1,4 +1,2 @@
 - path: definitions/Foo/properties/age/format
   reason: Because a really good reason.
-- path: paths/%2F/get/responses/200/schema/properties/age/format
-  reason: This reason is amazing.

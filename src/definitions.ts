@@ -5,10 +5,9 @@ import {
   parseReference,
   ReferenceMetadata,
   toSorted,
+  getRegistryName,
 } from "./util.js";
-import * as fs from "fs";
 import path from "path";
-import { SuppressionRegistry } from "./suppression.js";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {
@@ -33,26 +32,13 @@ class CollectionRegistry {
       if (subdata !== undefined) {
         for (const [name, _] of toSorted(Object.entries(subdata))) {
           const resolvedPath = getResolvedPath(filepath).replace(/\\/g, "/");
-          const pathKey = `${resolvedPath}#/${this.getRegistryName()}/${name}`;
+          const pathKey = `${resolvedPath}#/${getRegistryName(this.kind)}/${name}`;
           // we don't care about unreferenced common-types
           if (!resolvedPath.includes("common-types")) {
             this.unreferenced.add(pathKey);
           }
         }
       }
-    }
-  }
-
-  getRegistryName(): string {
-    switch (this.kind) {
-      case RegistryKind.Definition:
-        return "definitions";
-      case RegistryKind.Parameter:
-        return "parameters";
-      case RegistryKind.Response:
-        return "responses";
-      case RegistryKind.SecurityDefinition:
-        return "securityDefinitions";
     }
   }
 
@@ -77,7 +63,7 @@ class CollectionRegistry {
   countReference(path: string, name: string, kind: RegistryKind) {
     // convert backslashes to forward slashes
     path = path.replace(/\\/g, "/");
-    const pathKey = `${path}#/${this.getRegistryName()}/${name}`;
+    const pathKey = `${path}#/${getRegistryName(this.kind)}/${name}`;
     this.unreferenced.delete(pathKey);
   }
 
