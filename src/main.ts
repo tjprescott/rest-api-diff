@@ -88,7 +88,7 @@ const args = await yargs(hideBin(process.argv))
   })
   .options("suppressions", {
     type: "string",
-    describe: "Path to a text file containing suppressions.",
+    describe: "Path to a YAML file containing suppressions.",
     default: process.env.SUPPRESSIONS,
   })
   .wrap(120)
