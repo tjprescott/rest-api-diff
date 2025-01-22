@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import { parse } from "yaml";
+import { getRegistryName, ReferenceMetadata } from "./util.js";
 
 export interface SuppressionMetadata {
   path: string;
@@ -7,14 +8,14 @@ export interface SuppressionMetadata {
 }
 
 export class SuppressionRegistry {
-  data = new Set<string>();
+  private data = new Set<string>();
 
   constructor(filepath: string) {
     const contents = fs.readFileSync(filepath, "utf8");
-    const data: SuppressionMetadata[] = parse(contents);
+    const data: SuppressionMetadata[] = parse(contents) ?? [];
     for (const item of data) {
       let path = item.path.trim().toLowerCase();
-      this.data.add(path);
+      this.add(path);
     }
   }
 
@@ -24,9 +25,8 @@ export class SuppressionRegistry {
    * @param key the Swagger path which serves as a key
    * @param path the transformed path to add to the suppression list
    */
-  add(key: string, path: string) {
+  add(path: string) {
     path = path.trim().toLowerCase();
-    key = key.toLowerCase();
     this.data.add(path);
   }
 
@@ -37,6 +37,20 @@ export class SuppressionRegistry {
   has(path: string | undefined): boolean {
     if (!path) return false;
     path = path.trim().toLowerCase();
-    return this.data.has(path);
+    const value = this.data.has(path);
+    return value;
+  }
+
+  propagateSuppression(ref: ReferenceMetadata, basePath: string[] | undefined) {
+    if (!basePath) throw new Error("basePath is undefined");
+    const base = basePath.join("/");
+    const target = `${getRegistryName(ref.registry)}/${ref.name}`.toLowerCase();
+    for (const item of this.data) {
+      if (item.startsWith(target)) {
+        // create a new string suppression propagating the suppression onto the base path
+        const newItem = item.replace(target, base);
+        this.add(newItem);
+      }
+    }
   }
 }

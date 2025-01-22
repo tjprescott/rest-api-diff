@@ -23,11 +23,12 @@ export interface DiffClientConfig {
 }
 
 export class DiffClient {
-  private args: any;
+  public args: any;
+  public suppressions?: SuppressionRegistry;
+
   private rules: RuleSignature[];
   private lhsParser?: SwaggerParser;
   private rhsParser?: SwaggerParser;
-  private suppressions?: SuppressionRegistry;
   /** Tracks if shortenKeys has been called to avoid re-running the algorithm needlessly. */
   private keysShortened: boolean = false;
 
@@ -48,13 +49,13 @@ export class DiffClient {
     const lhs = client.args["lhs"].map((x: string) => path.resolve(x));
     const rhs = client.args["rhs"].map((x: string) => path.resolve(x));
 
-    const lhsParser = await SwaggerParser.create(lhs, client.args);
-    const rhsParser = await SwaggerParser.create(rhs, client.args);
     if (client.args["suppressions"]) {
       client.suppressions = new SuppressionRegistry(
         client.args["suppressions"]
       );
     }
+    const lhsParser = await SwaggerParser.create(lhs, client);
+    const rhsParser = await SwaggerParser.create(rhs, client);
     client.lhsParser = lhsParser;
     client.rhsParser = rhsParser;
     return client;
@@ -194,7 +195,10 @@ export class DiffClient {
 
     // if a violation is suppressed, keep metadata the same but change it from a
     // flagged or assumed violation to `RuleResult.Suppressed`.
-    const isSuppressed = this.suppressions.has(getUrlEncodedPath(data.path));
+    const urlEncodedPath = getUrlEncodedPath(data.path);
+    const isSuppressed = this.suppressions
+      ? this.suppressions.has(urlEncodedPath)
+      : false;
     const finalRuleResult =
       (Array.isArray(finalResult) ? finalResult[0] : finalResult) ??
       RuleResult.AssumedViolation;

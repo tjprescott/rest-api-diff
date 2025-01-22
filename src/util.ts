@@ -369,3 +369,19 @@ export function getUrlEncodedPath(
   if (segments === undefined) return undefined;
   return segments.map((x: string) => encodeURIComponent(x)).join("/");
 }
+
+/**
+ * Returns the string key for the `RegistryKind` enum.
+ */
+export function getRegistryName(kind: RegistryKind): string {
+  switch (kind) {
+    case RegistryKind.Definition:
+      return "definitions";
+    case RegistryKind.Parameter:
+      return "parameters";
+    case RegistryKind.Response:
+      return "responses";
+    case RegistryKind.SecurityDefinition:
+      return "securityDefinitions";
+  }
+}
