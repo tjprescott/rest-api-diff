@@ -131,6 +131,7 @@ export class DefinitionRegistry {
       if (!refResult) {
         return item;
       }
+      // FIXME: Need to proprogate suppressions here too
       let match = this.get(refResult);
       if (match) {
         if (this.referenceStack.includes(refResult.name)) {
