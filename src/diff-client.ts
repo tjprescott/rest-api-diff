@@ -48,7 +48,6 @@ export class DiffClient {
     const client = new DiffClient(config);
     const lhs = client.args["lhs"].map((x: string) => path.resolve(x));
     const rhs = client.args["rhs"].map((x: string) => path.resolve(x));
-
     if (client.args["suppressions"]) {
       client.suppressions = new SuppressionRegistry(
         client.args["suppressions"]

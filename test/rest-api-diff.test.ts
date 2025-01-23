@@ -319,5 +319,5 @@ it("should propagate suppressions that are expanded while collecting definitions
   expect(client.diffResults?.assumedViolations.length).toBe(0);
   expect(client.diffResults?.flaggedViolations.length).toBe(0);
   expect(client.diffResults?.suppressedViolations.length).toBe(2);
-  expect(client.diffResults?.noViolations.length).toBe(1);
+  expect(client.diffResults?.noViolations.length).toBe(2);
 });
