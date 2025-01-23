@@ -9,6 +9,7 @@ export interface SuppressionMetadata {
 
 export class SuppressionRegistry {
   private data = new Set<string>();
+  public originalSuppressionCount = 0;
 
   constructor(filepath: string) {
     const contents = fs.readFileSync(filepath, "utf8");
@@ -17,6 +18,7 @@ export class SuppressionRegistry {
       let path = item.path.trim().toLowerCase();
       this.add(path);
     }
+    this.originalSuppressionCount = this.data.size;
   }
 
   /**
