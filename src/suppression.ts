@@ -46,6 +46,9 @@ export class SuppressionRegistry {
     if (!basePath) throw new Error("basePath is undefined");
     const base = basePath.join("/");
     const target = `${getRegistryName(ref.registry)}/${ref.name}`.toLowerCase();
+    if (target == "definitions/operation") {
+      let test = "best";
+    }
     for (const item of this.data) {
       if (item.startsWith(target)) {
         // create a new string suppression propagating the suppression onto the base path

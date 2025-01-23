@@ -313,11 +313,12 @@ export class DiffClient {
       path.join(outputFolder, "rhs-inv.json"),
       JSON.stringify(results.inverse[1], null, 2)
     );
-    const html = new HtmlDiffClient(
-      path.join(outputFolder, "lhs-inv.json"),
-      path.join(outputFolder, "rhs-inv.json")
-    );
-    html.writeOutput(path.join(outputFolder, "diff-inv.html"));
+    // TODO: Restore this later.
+    // const html = new HtmlDiffClient(
+    //   path.join(outputFolder, "lhs-inv.json"),
+    //   path.join(outputFolder, "rhs-inv.json")
+    // );
+    // html.writeOutput(path.join(outputFolder, "diff-inv.html"));
 
     // write the raw files to output for debugging purposes
     fs.writeFileSync(

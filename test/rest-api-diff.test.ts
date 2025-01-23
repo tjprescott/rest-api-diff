@@ -274,12 +274,36 @@ it("body parameter names should be normalized for stable sorting", async () => {
   expect(client.diffResults?.assumedViolations.length).toBe(0);
 });
 
-it("should propagate suppressions that target definitions", async () => {
+it("should propagate suppressions that are expanded during parsing", async () => {
   const config: DiffClientConfig = {
     lhs: ["test/files/suppressions1a.json"],
     rhs: ["test/files/suppressions1b.json"],
     args: {
-      suppressions: "test/files/suppressions.yaml",
+      suppressions: "test/files/suppressions1.yaml",
+    },
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  const [lhsParser, rhsParser] = client.getParsers();
+  expect(lhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(lhsParser.getUnreferencedTotal()).toBe(0);
+  expect(rhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(rhsParser.getUnreferencedTotal()).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.suppressedViolations.length).toBe(2);
+  expect(client.diffResults?.noViolations.length).toBe(1);
+});
+
+it("should propagate suppressions that are expanded while collecting definitions", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/suppressions2a.json"],
+    rhs: ["test/files/suppressions2b.json"],
+    args: {
+      suppressions: "test/files/suppressions2.yaml",
     },
     rules: getApplicableRules({}),
   };
