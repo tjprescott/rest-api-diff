@@ -462,12 +462,18 @@ export class DiffClient {
       }
     } else {
       console.info(`\n== NO ISSUES FOUND! ==\n`);
-      console.info("\n");
       if (summary.unreferencedObjects > 0 && preserveDefinitions) {
         console.info(
           `Note that there were ${summary.unreferencedObjects} unreferenced objects found, but the simple fact that are unreferenced is not considered a violation because you used '--preserve-definitions'.\n`
         );
       }
+      if (summary.suppressedViolations) {
+        const suppressionCount = this.suppressions?.originalSuppressionCount;
+        console.warn(
+          `Note that there were ${summary.suppressedViolations} violations suppressed. ${suppressionCount} suppressions need to be approved.`
+        );
+      }
+      console.info("\n");
       console.info(
         `See '${outputFolder}' for details. You may still want to compare 'lhs-inv.json' and 'rhs-inv.json' to check that the differences reflected are truly irrelevant.`
       );
