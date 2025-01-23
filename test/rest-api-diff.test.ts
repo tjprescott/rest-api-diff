@@ -321,3 +321,27 @@ it("should propagate suppressions that are expanded while collecting definitions
   expect(client.diffResults?.suppressedViolations.length).toBe(2);
   expect(client.diffResults?.noViolations.length).toBe(2);
 });
+
+it("should propagate suppressions for circular references", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/suppressions3a.json"],
+    rhs: ["test/files/suppressions3b.json"],
+    args: {
+      suppressions: "test/files/suppressions3.yaml",
+    },
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  const [lhsParser, rhsParser] = client.getParsers();
+  expect(lhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(lhsParser.getUnreferencedTotal()).toBe(0);
+  expect(rhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(rhsParser.getUnreferencedTotal()).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.suppressedViolations.length).toBe(2);
+  expect(client.diffResults?.noViolations.length).toBe(1);
+});
