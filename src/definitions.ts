@@ -144,6 +144,10 @@ export class DefinitionRegistry {
           for (const [key, value] of toSorted(Object.entries(itemCopy))) {
             matchCopy[key] = value;
           }
+          this.client?.suppressions?.propagateSuppression(
+            refResult,
+            this.currentPath
+          );
           return this.#expand(matchCopy, refResult.name);
         }
       } else {
