@@ -8,6 +8,7 @@ import {
   getRegistryName,
 } from "./util.js";
 import path from "path";
+import { DiffClient } from "./diff-client.js";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {
@@ -87,10 +88,10 @@ export class DefinitionRegistry {
   private providedPaths = new Set<string>();
   private referenceStack: string[] = [];
   private referenceMap = new Map<string, Set<string>>();
-  private currentPath: string | undefined;
-  private args: any;
+  private currentPath: string[];
+  private client: DiffClient;
 
-  constructor(map: Map<string, OpenAPIV2.Document>, args: any) {
+  constructor(map: Map<string, OpenAPIV2.Document>, client: DiffClient) {
     this.data = {
       definitions: new CollectionRegistry(
         map,
@@ -116,9 +117,9 @@ export class DefinitionRegistry {
     for (const key of map.keys()) {
       this.providedPaths.add(path.normalize(key));
     }
-    this.currentPath;
+    this.currentPath = [];
+    this.client = client;
     this.#gatherDefinitions(map);
-    this.args = args;
     this.#expandReferences();
   }
 
@@ -131,7 +132,6 @@ export class DefinitionRegistry {
       if (!refResult) {
         return item;
       }
-      // FIXME: Need to proprogate suppressions here too
       let match = this.get(refResult);
       if (match) {
         if (this.referenceStack.includes(refResult.name)) {
@@ -161,7 +161,9 @@ export class DefinitionRegistry {
       this.#expandDerivedClasses(item);
       this.#expandAllOf(item);
       for (const [propName, propValue] of toSorted(Object.entries(item))) {
+        this.currentPath.push(propName);
         expanded[propName] = this.#expand(propValue);
+        this.currentPath.pop();
       }
       return expanded;
     }
@@ -218,7 +220,10 @@ export class DefinitionRegistry {
         const itemVal = item[key];
         switch (key) {
           case "required":
-            base[key] = (baseVal ?? []).concat(itemVal ?? []);
+            const mergedRequired = new Set(
+              (baseVal ?? []).concat(itemVal ?? [])
+            );
+            base[key] = [...mergedRequired];
             break;
           case "properties":
             base[key] = { ...(baseVal ?? {}), ...(itemVal ?? {}) };
@@ -296,10 +301,11 @@ export class DefinitionRegistry {
   #expandReferencesForCollection(collection: CollectionRegistry) {
     this.referenceStack = [];
     for (const [filepath, values] of collection.data.entries()) {
-      this.currentPath = filepath;
       for (const [key, value] of values.entries()) {
+        this.currentPath.push(key);
         let expanded = this.#expand(value, key, filepath);
         collection.data.get(filepath)!.set(key, expanded);
+        this.currentPath.pop();
       }
     }
     // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
@@ -312,10 +318,18 @@ export class DefinitionRegistry {
   }
 
   #expandReferences() {
+    this.currentPath.push("definitions");
     this.#expandReferencesForCollection(this.data.definitions);
+    this.currentPath.pop();
+    this.currentPath.push("parameters");
     this.#expandReferencesForCollection(this.data.parameters);
+    this.currentPath.pop();
+    this.currentPath.push("responses");
     this.#expandReferencesForCollection(this.data.responses);
+    this.currentPath.pop();
+    this.currentPath.push("securityDefinitions");
     this.#expandReferencesForCollection(this.data.securityDefinitions);
+    this.currentPath.pop();
   }
 
   /**

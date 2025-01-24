@@ -39,19 +39,15 @@ export class SuppressionRegistry {
   has(path: string | undefined): boolean {
     if (!path) return false;
     path = path.trim().toLowerCase();
-    const value = this.data.has(path);
-    return value;
+    return this.data.has(path);
   }
 
   propagateSuppression(ref: ReferenceMetadata, basePath: string[] | undefined) {
     if (!basePath) throw new Error("basePath is undefined");
     const base = basePath.join("/");
     const target = `${getRegistryName(ref.registry)}/${ref.name}`.toLowerCase();
-    if (target == "definitions/operation") {
-      let test = "best";
-    }
     for (const item of this.data) {
-      if (item.startsWith(target)) {
+      if (item === target || item.startsWith(`${target}/`)) {
         // create a new string suppression propagating the suppression onto the base path
         const newItem = item.replace(target, base);
         this.add(newItem);
