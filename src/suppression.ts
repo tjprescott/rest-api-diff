@@ -47,7 +47,7 @@ export class SuppressionRegistry {
     const base = basePath.join("/");
     const target = `${getRegistryName(ref.registry)}/${ref.name}`.toLowerCase();
     for (const item of this.data) {
-      if (item.startsWith(target)) {
+      if (item === target || item.startsWith(`${target}/`)) {
         // create a new string suppression propagating the suppression onto the base path
         const newItem = item.replace(target, base);
         this.add(newItem);
