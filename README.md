@@ -51,6 +51,7 @@ but will not search subfolders.
   these, for example to compare the definitions themselves between two Swaggers, provide this flag.
 - `--flatten-paths`: The default format of paths in the output is an array of path segments. If you prefer
   to flatten these into a forward-slash delimited string, provide this flag.
+- `--suppressions`: Path to a YAML file containing suppressions.
 
 ### .env File
 
@@ -127,3 +128,14 @@ rule can make one of three determinations:
 - `RuleResult.ContinueProcessing`: the logic of the rule doesn't apply to this diff and thus the tool should continue processing rules.
 
 When processing a diff item against the rules, if `NoViolation` is returned by a rule, it immediately suspends processing additional rules. If `FlaggedViolation` is returned, rules will continue to be processed in case another rule marks it as `NoViolation`. If all rules are run and no determination is made, then the diff is assumed to affect the API surface area and is tracked as an assumed violation. It will be reported by the tool and will appear in a visual diff. When violations are grouped, these violations will appear in the `UNGROUPED` group.
+
+## Suppressions
+
+It is possible that there will be differences between Swaggers that do matter but must be accepted. For this, you can point to a suppression file using the `--suppressions` option. This file should be a YAML file with the following schema:
+
+```yaml
+- path: "path/to/target/"
+  reason: "This is a reason why this path is suppressed."
+```
+
+You can target paths directly from the `diff.json` file assuming `--flatten-paths` is used; however, often violations originate in definitions or parameters, and the way `rest-api-diff` expands these references to create the transformation, the result is that these diffs will be multiplied. In this case, you can use the path to the element in question from the Swagger and it will automatically resolve all diffs that might be a result of reference expansion. Because `rest-api-diff` compares these as Swagger, you cannot use a TypeSpec path even if you are targeting TypeSpec. You must use the Swagger path associated with the TypeSpec-generated Swagger.
