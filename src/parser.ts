@@ -40,10 +40,11 @@ export class SwaggerParser {
    */
   static async create(
     paths: string | string[],
+    rootPath: string | undefined,
     client: DiffClient
   ): Promise<SwaggerParser> {
     const parser = new SwaggerParser();
-    const pathMap = await loadPaths(forceArray(paths), client.args);
+    const pathMap = await loadPaths(forceArray(paths), rootPath, client.args);
     parser.defRegistry = new DefinitionRegistry(pathMap, client);
     parser.swaggerMap = pathMap;
     parser.client = client;
