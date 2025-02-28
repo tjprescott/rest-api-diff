@@ -48,7 +48,7 @@ import { xPropertyRemovedRule } from "./x-property-removed.js";
 import { xDefaultRemovedRule } from "./x-default-removed.js";
 import { xDiskControllerTypeItemsRemovedRule } from "./x-disk-controller-type-items-removed.js";
 import { xPropertyAddedRule } from "./x-property-added.js";
-import { xNullableRemovedRule } from "./x-nullable-removed.js";
+import { xNullableChangedRule } from "./x-nullable-changed.js";
 import { xMsIdentifiersChangedRule } from "./x-ms-identifiers-added.js";
 import { xSecurityAddedRule } from "./x-security-added.js";
 
@@ -123,7 +123,7 @@ export function getApplicableRules(args: any): RuleSignature[] {
     xPropertyAddedRule,
     xDefaultRemovedRule,
     xDiskControllerTypeItemsRemovedRule,
-    xNullableRemovedRule,
+    xNullableChangedRule,
     xMsIdentifiersChangedRule,
     xSecurityAddedRule,
   ];

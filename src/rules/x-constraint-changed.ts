@@ -50,6 +50,16 @@ export function xConstraintChangedRule(
     return RuleResult.NoViolation;
   }
 
+  // ignores if rhs added maxLength 90 to resourceGroupName
+  if (
+    lastPath === "maxLength" &&
+    parameter.name.toLowerCase() === "resourcegroupname" &&
+    data.kind == "N" &&
+    data.rhs === 90
+  ) {
+    return RuleResult.NoViolation;
+  }
+
   const message = `Constraint '${lastPath}' changed for parameter '${parameter.name}'`;
   return [RuleResult.FlaggedViolation, message];
 }
