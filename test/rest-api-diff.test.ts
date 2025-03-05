@@ -264,10 +264,25 @@ it("matching no rule should results in an UNGROUPED violation", async () => {
   }
 });
 
-it("body parameter names should be normalized for stable sorting", async () => {
+it("should normalize body parameter names for stable sorting", async () => {
   const config: DiffClientConfig = {
     lhs: ["test/files/test4a.json"],
     rhs: ["test/files/test4b.json"],
+    args: {},
+    rules: [],
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.noViolations.length).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
+});
+
+it("should sort arrays of strings for stable comparison", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/test5a.json"],
+    rhs: ["test/files/test5b.json"],
     args: {},
     rules: [],
   };
