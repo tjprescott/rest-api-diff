@@ -259,7 +259,7 @@ it("matching no rule should results in an UNGROUPED violation", async () => {
   }
 });
 
-it("body parameter names should be normalized for stable sorting", async () => {
+it("should normalize body parameter names for stable sorting", async () => {
   const config: DiffClientConfig = {
     lhs: ["test/files/test4a.json"],
     rhs: ["test/files/test4b.json"],
@@ -272,4 +272,91 @@ it("body parameter names should be normalized for stable sorting", async () => {
   expect(client.diffResults?.flaggedViolations.length).toBe(0);
   expect(client.diffResults?.noViolations.length).toBe(0);
   expect(client.diffResults?.assumedViolations.length).toBe(0);
+});
+
+it("should sort arrays of strings for stable comparison", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/test5a.json"],
+    rhs: ["test/files/test5b.json"],
+    args: {},
+    rules: [],
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.noViolations.length).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
+});
+
+it("should propagate suppressions that are expanded during parsing", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/suppressions1a.json"],
+    rhs: ["test/files/suppressions1b.json"],
+    args: {
+      suppressions: "test/files/suppressions1.yaml",
+    },
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  const [lhsParser, rhsParser] = client.getParsers();
+  expect(lhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(lhsParser.getUnreferencedTotal()).toBe(0);
+  expect(rhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(rhsParser.getUnreferencedTotal()).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.suppressedViolations.length).toBe(2);
+  expect(client.diffResults?.noViolations.length).toBe(1);
+});
+
+it("should propagate suppressions that are expanded while collecting definitions", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/suppressions2a.json"],
+    rhs: ["test/files/suppressions2b.json"],
+    args: {
+      suppressions: "test/files/suppressions2.yaml",
+    },
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  const [lhsParser, rhsParser] = client.getParsers();
+  expect(lhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(lhsParser.getUnreferencedTotal()).toBe(0);
+  expect(rhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(rhsParser.getUnreferencedTotal()).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.suppressedViolations.length).toBe(2);
+  expect(client.diffResults?.noViolations.length).toBe(2);
+});
+
+it("should propagate suppressions for circular references", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/suppressions3a.json"],
+    rhs: ["test/files/suppressions3b.json"],
+    args: {
+      suppressions: "test/files/suppressions3.yaml",
+    },
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  client.buildOutput();
+  const [lhsParser, rhsParser] = client.getParsers();
+  expect(lhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(lhsParser.getUnreferencedTotal()).toBe(0);
+  expect(rhsParser.getUnresolvedReferences().length).toBe(0);
+  expect(rhsParser.getUnreferencedTotal()).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.suppressedViolations.length).toBe(2);
+  expect(client.diffResults?.noViolations.length).toBe(1);
 });
