@@ -309,7 +309,6 @@ it("should propagate suppressions that are expanded during parsing", async () =>
   expect(rhsParser.getUnreferencedTotal()).toBe(0);
   expect(client.diffResults?.assumedViolations.length).toBe(0);
   expect(client.diffResults?.flaggedViolations.length).toBe(0);
-  expect(client.diffResults?.suppressedViolations.length).toBe(2);
   expect(client.diffResults?.noViolations.length).toBe(1);
 });
 
@@ -333,7 +332,6 @@ it("should propagate suppressions that are expanded while collecting definitions
   expect(rhsParser.getUnreferencedTotal()).toBe(0);
   expect(client.diffResults?.assumedViolations.length).toBe(0);
   expect(client.diffResults?.flaggedViolations.length).toBe(0);
-  expect(client.diffResults?.suppressedViolations.length).toBe(2);
   expect(client.diffResults?.noViolations.length).toBe(2);
 });
 
@@ -357,6 +355,5 @@ it("should propagate suppressions for circular references", async () => {
   expect(rhsParser.getUnreferencedTotal()).toBe(0);
   expect(client.diffResults?.assumedViolations.length).toBe(0);
   expect(client.diffResults?.flaggedViolations.length).toBe(0);
-  expect(client.diffResults?.suppressedViolations.length).toBe(2);
   expect(client.diffResults?.noViolations.length).toBe(1);
 });

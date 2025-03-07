@@ -339,6 +339,9 @@ export function forceArray<T>(value: T | T[]): T[] {
  * If the path is relative, the root path must be provided.
  */
 export function getResolvedPath(targetPath: string, rootPath?: string): string {
+  if (targetPath === undefined) {
+    let test = "best";
+  }
   if (targetPath.startsWith(".") && !rootPath) {
     throw new Error("Root path must be provided to resolve relative paths.");
   }
