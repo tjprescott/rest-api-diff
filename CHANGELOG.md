@@ -2,6 +2,8 @@
 
 ## 0.2.0 (TBD)
 
+- Fixed issue where relative references would sometimes be resolved incorrectly. `--lhs-root`
+  and `--rhs-root` are still needed when compiling TypeSpec. See README.md.
 - Arrays of strings are now sorted to ensure that differences in sorting do not trigger diffs.
 - Fixed issue where local references with `-` character would not be resolved.
 - Using `--group-violations` will auto-generate groupings.
