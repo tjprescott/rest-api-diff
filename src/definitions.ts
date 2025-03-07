@@ -181,7 +181,7 @@ export class DefinitionRegistry {
       const expVal = this.#expand(val);
       expanded.push(expVal);
     }
-    return expanded;
+    return expanded.toSorted();
   }
 
   #expandDerivedClasses(base: any): any {
@@ -354,7 +354,9 @@ export class DefinitionRegistry {
       }
     } else if (allOf) {
       // allOf is listing properties to mix-in
-      throw new Error(`Please contact support. Unsupported allOf: ${allOf}`);
+      throw new Error(
+        `Please contact support. Unsupported allOf scenario: ${allOf}`
+      );
     }
   }
 

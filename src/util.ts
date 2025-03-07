@@ -3,7 +3,6 @@ import * as fs from "fs";
 import { exec } from "child_process";
 import path from "path";
 
-const typespecOutputDir = `${process.cwd()}/tsp-output`;
 const referenceRegex = /"\$ref":\s*"([^"]*?\.json)(?:#([^"]*?))?"/gm;
 
 export interface ReferenceMetadata {
@@ -76,36 +75,20 @@ export function isReference(value: any): boolean {
   return Object.keys(value).includes("$ref");
 }
 
-async function loadFolderContents(
+async function loadFile(
   path: string,
+  rootPath: string | undefined,
   args: any
 ): Promise<Map<string, any>> {
-  const compileTsp = args["compile-tsp"];
-  const swaggerValues = await loadFolder(path);
-  // if compile-tsp is set, always attempt to compile TypeSpec files.
-  const typespecValues = compileTsp
-    ? await compileTypespec(path, args)
-    : undefined;
-  if (compileTsp) {
-    if (!typespecValues && !swaggerValues) {
-      throw new Error(`No Swagger or TypeSpec files found: ${path}`);
-    }
-    return (typespecValues ?? swaggerValues)!;
-  } else {
-    if (!swaggerValues) {
-      throw new Error(`No Swagger files found: ${path}`);
-    }
-    return swaggerValues;
-  }
-}
-
-async function loadFile(path: string, args: any): Promise<Map<string, any>> {
   let contents = new Map<string, any>();
   const compileTsp = args["compile-tsp"];
   if (path.endsWith(".tsp") && compileTsp) {
-    contents = { ...contents, ...(await compileTypespec(path, args)) };
+    contents = {
+      ...contents,
+      ...(await compileTypespec(path, rootPath, args)),
+    };
   } else if (path.endsWith(".json")) {
-    const swaggerContent = await loadSwaggerFile(path);
+    const swaggerContent = await loadSwaggerFile(path, rootPath);
     contents.set(path, swaggerContent);
   } else {
     throw new Error(`Unsupported file type: ${path}`);
@@ -118,6 +101,7 @@ async function loadFile(path: string, args: any): Promise<Map<string, any>> {
 
 export async function loadPaths(
   paths: string[],
+  rootPath: string | undefined,
   args: any
 ): Promise<Map<string, any>> {
   let jsonContents = new Map<string, any>();
@@ -127,11 +111,43 @@ export async function loadPaths(
       throw new Error(`Invalid path ${path}`);
     }
     const stats = fs.statSync(path);
-    const values = stats.isDirectory()
-      ? await loadFolderContents(path, args)
-      : await loadFile(path, args);
+    let values: Map<string, any> | undefined;
+    let compiledTypespec: boolean;
+    if (stats.isDirectory()) {
+      const compileTsp = args["compile-tsp"];
+
+      // always try to load Swagger first, if it exists.
+      const swaggerValues = await loadFolder(path, rootPath);
+
+      // if compile-tsp is set, always attempt to compile TypeSpec files.
+      const typespecValues = compileTsp
+        ? await compileTypespec(path, rootPath, args)
+        : undefined;
+      compiledTypespec = typespecValues !== undefined;
+
+      if (compiledTypespec && !rootPath) {
+        throw new Error(
+          "Root path must be provided to resolve relative paths in compiled TypeSpec."
+        );
+      }
+      if (compileTsp) {
+        if (!typespecValues && !swaggerValues) {
+          throw new Error(`No Swagger or TypeSpec files found: ${path}`);
+        }
+        values = (typespecValues ?? swaggerValues)!;
+      } else {
+        if (!swaggerValues) {
+          throw new Error(`No Swagger files found: ${path}`);
+        }
+        values = swaggerValues;
+      }
+    } else {
+      values = await loadFile(path, rootPath, args);
+    }
+
+    // load the initial top-level files and extract any references
     for (const [key, value] of values.entries()) {
-      const fileRefs = await extractFileReferences(key);
+      const fileRefs = await extractFileReferences(key, rootPath);
       for (const ref of fileRefs) {
         refs.add(ref);
       }
@@ -139,15 +155,24 @@ export async function loadPaths(
       jsonContents.set(resolvedKey, value);
     }
   }
+
   // remove all the paths that were already loaded
   const resolvedKeys = [...jsonContents.keys()].map((key) =>
     getResolvedPath(key)
   );
+
+  // now load any references which may themselves contain references
   const externalPathsToLoad = [...refs].filter(
     (key) => !resolvedKeys.includes(key)
   );
   if (externalPathsToLoad.length > 0) {
-    const additionalContents = await loadPaths(externalPathsToLoad, args);
+    // do not use rootPath for additional contents. They should use their own location to
+    // resolve relative references.
+    const additionalContents = await loadPaths(
+      externalPathsToLoad,
+      undefined,
+      args
+    );
     for (const [key, value] of additionalContents.entries()) {
       jsonContents.set(key, value);
     }
@@ -158,20 +183,28 @@ export async function loadPaths(
 /** Expands all references into fully-qualified ones and ensures consistent use
  * of forward slashes.
  */
-function normalizeReferences(filepath: string, content: string): string {
+function normalizeReferences(
+  filepath: string,
+  content: string,
+  rootPath: string | undefined
+): string {
   // ensure backslashes are replaced with forward slashes
   filepath = getResolvedPath(filepath).replace(/\\/g, "/");
 
-  // Expand all relative references
+  // Expand all relative references. If rootPath is supplied, use that.
+  // Otherwise use the filepath location to resolve relative references.
   const relativeRefRegex = referenceRegex;
   let updated = content.replace(relativeRefRegex, (_, relPath, target) => {
-    const resolvedPath = getResolvedPath(relPath, filepath).replace(/\\/g, "/");
+    const resolvedPath = getResolvedPath(relPath, rootPath ?? filepath).replace(
+      /\\/g,
+      "/"
+    );
     const newRef = target ? `${resolvedPath}#${target}` : resolvedPath;
     return `"$ref": "${newRef}"`;
   });
 
   // Expand all local references
-  const localRefRegex = /"\$ref": "(#\/\w+\/[\w\.]+)"/gm;
+  const localRefRegex = /"\$ref": "(#\/\w+\/[\w\-\.]+)"/gm;
   updated = updated.replace(localRefRegex, (_, target) => {
     const newRef = `${filepath}${target}`;
     return `"$ref": "${newRef}"`;
@@ -184,11 +217,13 @@ function normalizeReferences(filepath: string, content: string): string {
  * ones. If the file is not a Swagger file, it will return undefined.
  */
 export async function loadSwaggerFile(
-  sourcePath: string
+  sourcePath: string,
+  rootPath: string | undefined
 ): Promise<any | undefined> {
   const fileContent = normalizeReferences(
     sourcePath,
-    fs.readFileSync(sourcePath, "utf-8")
+    fs.readFileSync(sourcePath, "utf-8"),
+    rootPath
   );
   try {
     const jsonContent = JSON.parse(fileContent);
@@ -212,17 +247,21 @@ export async function loadSwaggerFile(
  * @param path The path to the file.
  * @returns An array of file paths that are referenced.
  */
-export async function extractFileReferences(path: string): Promise<string[]> {
+export async function extractFileReferences(
+  path: string,
+  rootPath: string | undefined
+): Promise<string[]> {
   const visited = new Set<string>();
 
   async function extractFileReferencesInternal(
-    path: string
+    path: string,
+    rootPath: string | undefined
   ): Promise<string[]> {
     if (visited.has(path)) {
       return [];
     }
     const resultSet = new Set<string>();
-    const fileContents = JSON.stringify(await loadSwaggerFile(path));
+    const fileContents = JSON.stringify(await loadSwaggerFile(path, rootPath));
     const refMatches = [...fileContents.matchAll(referenceRegex)];
     for (const match of refMatches) {
       let matchPath = match[1];
@@ -236,20 +275,28 @@ export async function extractFileReferences(path: string): Promise<string[]> {
       }
     }
     visited.add(path);
-    // recursively search for new references within the referenced files
+    // recursively search for new references within the referenced files. Do not
+    // use rootPath for nested references. They should use their own location to
+    // resolve relative references.
     for (const childPath of resultSet) {
-      const nestedRefs = await extractFileReferencesInternal(childPath);
+      const nestedRefs = await extractFileReferencesInternal(
+        childPath,
+        undefined
+      );
       for (const ref of nestedRefs) {
         resultSet.add(ref);
       }
     }
     return [...resultSet];
   }
-  const resultSet = await extractFileReferencesInternal(path);
+  const resultSet = await extractFileReferencesInternal(path, rootPath);
   return [...resultSet];
 }
 
-async function loadFolder(path: string): Promise<Map<string, any> | undefined> {
+async function loadFolder(
+  path: string,
+  rootPath: string | undefined
+): Promise<Map<string, any> | undefined> {
   const jsonContents = new Map<string, any>();
   const pathsToLoad = fs.readdirSync(path);
   for (const filePath of pathsToLoad) {
@@ -259,7 +306,7 @@ async function loadFolder(path: string): Promise<Map<string, any> | undefined> {
     if (filePathStats.isDirectory()) {
       continue;
     }
-    const contents = await loadSwaggerFile(fullPath);
+    const contents = await loadSwaggerFile(fullPath, rootPath);
     if (contents) {
       jsonContents.set(fullPath, contents);
     }
@@ -281,8 +328,10 @@ function validatePath(value: string): boolean {
  */
 async function compileTypespec(
   path: string,
+  rootPath: string | undefined,
   args: any
 ): Promise<Map<string, any> | undefined> {
+  const typespecOutputDir = rootPath ?? `${process.cwd()}/tsp-output`;
   const compilerPath = args["typespec-compiler-path"];
   const isDir = fs.statSync(path).isDirectory();
   if (isDir) {
@@ -326,7 +375,7 @@ async function compileTypespec(
   }
   // if successful, there should be a Swagger file in the folder,
   // so attempt to reload.
-  return await loadFolder(typespecOutputDir);
+  return await loadFolder(typespecOutputDir, rootPath);
 }
 
 /** Converts a single value or array to an array. */
@@ -342,9 +391,19 @@ export function getResolvedPath(targetPath: string, rootPath?: string): string {
   if (targetPath.startsWith(".") && !rootPath) {
     throw new Error("Root path must be provided to resolve relative paths.");
   }
-  return rootPath
-    ? path.resolve(path.dirname(rootPath), targetPath)
-    : path.resolve(targetPath);
+
+  if (rootPath !== undefined) {
+    // check if rootpath is already a dir or a file
+    const stats = fs.statSync(rootPath);
+    if (stats.isDirectory()) {
+      return path.resolve(rootPath, targetPath);
+    } else if (stats.isFile()) {
+      return path.resolve(path.dirname(rootPath), targetPath);
+    } else {
+      throw new Error("Root path is neither a file nor a directory.");
+    }
+  }
+  return path.resolve(targetPath);
 }
 
 /**

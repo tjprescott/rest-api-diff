@@ -44,9 +44,14 @@ export class DiffClient {
     const client = new DiffClient(config);
     const lhs = client.args["lhs"].map((x: string) => path.resolve(x));
     const rhs = client.args["rhs"].map((x: string) => path.resolve(x));
-
-    const lhsParser = await SwaggerParser.create(lhs, client.args);
-    const rhsParser = await SwaggerParser.create(rhs, client.args);
+    const lhsRoot = client.args["lhs-root"]
+      ? path.resolve(client.args["lhs-root"])
+      : undefined;
+    const rhsRoot = client.args["rhs-root"]
+      ? path.resolve(client.args["rhs-root"])
+      : undefined;
+    const lhsParser = await SwaggerParser.create(lhs, lhsRoot, client);
+    const rhsParser = await SwaggerParser.create(rhs, rhsRoot, client);
     client.lhsParser = lhsParser;
     client.rhsParser = rhsParser;
     return client;
