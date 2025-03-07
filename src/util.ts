@@ -171,7 +171,7 @@ function normalizeReferences(filepath: string, content: string): string {
   });
 
   // Expand all local references
-  const localRefRegex = /"\$ref": "(#\/\w+\/[\w\.]+)"/gm;
+  const localRefRegex = /"\$ref": "(#\/\w+\/[\w\-\.]+)"/gm;
   updated = updated.replace(localRefRegex, (_, target) => {
     const newRef = `${filepath}${target}`;
     return `"$ref": "${newRef}"`;
@@ -339,9 +339,6 @@ export function forceArray<T>(value: T | T[]): T[] {
  * If the path is relative, the root path must be provided.
  */
 export function getResolvedPath(targetPath: string, rootPath?: string): string {
-  if (targetPath === undefined) {
-    let test = "best";
-  }
   if (targetPath.startsWith(".") && !rootPath) {
     throw new Error("Root path must be provided to resolve relative paths.");
   }
