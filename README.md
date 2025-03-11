@@ -116,13 +116,15 @@ debugging purposes.
 
 ## Running against the REST API Specs Repo
 
-These steps assumed that `--lhs` points to a Swagger folder and `--rhs` points to a TypeSpec folder, both within the REST API specs repo. If this is not the case, your steps will differ.
+These steps assume that `--lhs` points to a Swagger folder and `--rhs` points to a TypeSpec folder, both within the REST API specs repo. If this is not the case, your steps will differ.
 
 1. Ensure you have updated the dependencies in your fork by running `npm install` in the REST API specs repo root. You may need to delete `package-lock.json` first. Copy the path to the `node_modules/@typespec/compiler` package.
 2. Set the `TYPESPEC_COMPILER_PATH` environment variable (ideally in .env) to the path you copied in step 1.
 3. Ensure that LHS and RHS point to the appropriate paths in the REST API specs repo.
 4. By convention, if you are comparing hand-written Swagger to TypeSpec, the Swagger should be LHS and the TypeSpec should be RHS. When compiling TypeSpec, you will
-   need to set RHS_ROOT. It will generally be the same path as LHS, but with the "stable" or "preview" segment replaced with "generated".
+   need to set RHS_ROOT. **If you are following the convention, the tool will automatically use the same folder as LHS for RHS_ROOT except changing the "stable" or "preview"
+   folder to "temp", which will subsequently be deleted after the tool completes.** This is so the relative paths get generated and resolve correctly without bulldozing
+   and existing files.
 5. If you are comparing to a multi-versioned TypeSpec, you should probably include the `TYPESPEC_VERSION_SELECTOR` environment variable to ensure you are generating the right version for comparison.
 
 ## Rules

@@ -1,6 +1,6 @@
 # @azure-tools/rest-api-diff
 
-## 0.2.0 (TBD)
+## 0.2.0 (2025-03-11)
 
 - Fixed issue where relative references would sometimes be resolved incorrectly. `--lhs-root`
   and `--rhs-root` are still needed when compiling TypeSpec. See README.md.

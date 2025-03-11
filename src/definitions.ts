@@ -181,7 +181,7 @@ export class DefinitionRegistry {
       const expVal = this.#expand(val);
       expanded.push(expVal);
     }
-    return expanded.toSorted();
+    return toSorted(expanded);
   }
 
   #expandDerivedClasses(base: any): any {
