@@ -354,7 +354,9 @@ export class DefinitionRegistry {
       }
     } else if (allOf) {
       // allOf is listing properties to mix-in
-      throw new Error(`Please contact support. Unsupported allOf: ${allOf}`);
+      throw new Error(
+        `Please contact support. Unsupported allOf scenario: ${allOf}`
+      );
     }
   }
 

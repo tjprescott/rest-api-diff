@@ -8,6 +8,7 @@ import {
   parseReference,
   toSorted,
 } from "./util.js";
+import { DiffClient } from "./diff-client.js";
 
 /** Parameterized Host Metadata */
 interface ParameterizedHost {
@@ -36,11 +37,12 @@ export class SwaggerParser {
    */
   static async create(
     paths: string | string[],
-    args: any
+    rootPath: string | undefined,
+    client: DiffClient
   ): Promise<SwaggerParser> {
     const parser = new SwaggerParser();
-    const pathMap = await loadPaths(forceArray(paths), args);
-    parser.defRegistry = new DefinitionRegistry(pathMap, args);
+    const pathMap = await loadPaths(forceArray(paths), rootPath, client.args);
+    parser.defRegistry = new DefinitionRegistry(pathMap, client);
     parser.swaggerMap = pathMap;
     return parser;
   }

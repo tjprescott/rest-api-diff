@@ -1,7 +1,11 @@
 # @azure-tools/rest-api-diff
 
-## 0.1.9 (TBD)
+## 0.2.0 (2025-03-11)
 
+- Fixed issue where relative references would sometimes be resolved incorrectly. `--lhs-root`
+  and `--rhs-root` are still needed when compiling TypeSpec. See README.md.
+- Arrays of strings are now sorted to ensure that differences in sorting do not trigger diffs.
+- Fixed issue where local references with `-` character would not be resolved.
 - Using `--group-violations` will auto-generate groupings.
 - Added `--flatten-paths` option to allowing flattening paths in the output to compress vertical space.
 - Add rule to better ignore diffs in `x-ms-examples`.

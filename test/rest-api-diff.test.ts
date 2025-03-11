@@ -164,6 +164,7 @@ it("should compare two Swagger folders", async () => {
 it("should compare a Swagger folder and a TypeSpec folder", async () => {
   const args = {
     "compile-tsp": true,
+    "rhs-root": "test/files/typespecMulti",
   };
   const config: DiffClientConfig = {
     lhs: ["test/files/swaggerMulti"],
@@ -180,7 +181,11 @@ it("should compare a Swagger folder and a TypeSpec folder", async () => {
 }, 30000); // longer timeout necessary to compile TypeSpec
 
 it("should resolve external swagger references", async () => {
-  const paths = await loadPaths(["test/files/swaggerExternalReferences"], {});
+  const paths = await loadPaths(
+    ["test/files/swaggerExternalReferences"],
+    undefined,
+    {}
+  );
   const pathKeys = toSorted([...paths.keys()]);
   const cwd = process.cwd();
   const expected = toSorted([
@@ -259,17 +264,32 @@ it("matching no rule should results in an UNGROUPED violation", async () => {
   }
 });
 
-it("body parameter names should be normalized for stable sorting", async () => {
+it("should normalize body parameter names for stable sorting", async () => {
   const config: DiffClientConfig = {
     lhs: ["test/files/test4a.json"],
     rhs: ["test/files/test4b.json"],
     args: {},
-    rules: [],
+    rules: getApplicableRules({}),
   };
   const client = await TestableDiffClient.create(config);
   client.parse();
   client.processDiff();
   expect(client.diffResults?.flaggedViolations.length).toBe(0);
   expect(client.diffResults?.noViolations.length).toBe(0);
+  expect(client.diffResults?.assumedViolations.length).toBe(0);
+});
+
+it("should sort arrays of strings for stable comparison", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/test5a.json"],
+    rhs: ["test/files/test5b.json"],
+    args: {},
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  client.processDiff();
+  expect(client.diffResults?.flaggedViolations.length).toBe(0);
+  expect(client.diffResults?.noViolations.length).toBe(2);
   expect(client.diffResults?.assumedViolations.length).toBe(0);
 });
