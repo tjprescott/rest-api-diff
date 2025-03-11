@@ -30,7 +30,6 @@ it("config should group violations when --group-violations is set", async () => 
     "Changed_format (AUTO)",
     "Added_favoriteColor (AUTO)",
     "ArrayItem_Added_required (AUTO)",
-    "Changed_required (AUTO)",
   ]);
 
   const diffInvPath = path.join(tempDir, "diff-inv.json");
@@ -45,7 +44,7 @@ it("config should group violations when --group-violations is set", async () => 
   const invCounts = Object.values(diffInvFile).map(
     (item: any) => item.items.length
   );
-  expect(invCounts).toStrictEqual([7, 4]);
+  expect(invCounts).toStrictEqual([7, 3]);
   expect(invCounts).toStrictEqual(invCounts.sort());
 
   // ensure name is removed from each value
@@ -270,7 +269,7 @@ it("should normalize body parameter names for stable sorting", async () => {
     lhs: ["test/files/test4a.json"],
     rhs: ["test/files/test4b.json"],
     args: {},
-    rules: [],
+    rules: getApplicableRules({}),
   };
   const client = await TestableDiffClient.create(config);
   client.parse();
@@ -285,12 +284,12 @@ it("should sort arrays of strings for stable comparison", async () => {
     lhs: ["test/files/test5a.json"],
     rhs: ["test/files/test5b.json"],
     args: {},
-    rules: [],
+    rules: getApplicableRules({}),
   };
   const client = await TestableDiffClient.create(config);
   client.parse();
   client.processDiff();
   expect(client.diffResults?.flaggedViolations.length).toBe(0);
-  expect(client.diffResults?.noViolations.length).toBe(0);
+  expect(client.diffResults?.noViolations.length).toBe(2);
   expect(client.diffResults?.assumedViolations.length).toBe(0);
 });

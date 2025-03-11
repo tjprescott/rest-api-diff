@@ -19,6 +19,7 @@ import { pathRemovedRule } from "./path-removed.js";
 import { responseAddedRule } from "./response-added.js";
 import { responseRemovedRule } from "./response-removed.js";
 import { ignoreTagsRule } from "./ignore-tags.js";
+import { ignoreEquivalentArrays } from "./ignore-equivalent-arrays.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -39,6 +40,7 @@ export type RuleSignature = (
 /** Returns the list of rules that should be applied, modified by any options. */
 export function getApplicableRules(args: any): RuleSignature[] {
   let rules = [
+    ignoreEquivalentArrays,
     ignoreSwaggerPropertiesRule,
     ignoreIrrelevantResponsePropertiesRule,
     ignoreXMsErrorCodeHeaderRule,
