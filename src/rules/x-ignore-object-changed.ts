@@ -2,7 +2,7 @@ import { Diff } from "deep-diff";
 import { RuleResult } from "./rules.js";
 
 /**
- * Flags when a type value has changed.
+ * Ignores when the type of an object changed between "undefined" and "object".
  */
 export function xIgnoreObjectChangedRule(
   data: Diff<any, any>
