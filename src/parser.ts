@@ -3,6 +3,7 @@ import { OpenAPIV2 } from "openapi-types";
 import { DefinitionRegistry, RegistryKind } from "./definitions.js";
 import {
   forceArray,
+  getUrlEncodedPath,
   isReference,
   loadPaths,
   parseReference,
@@ -27,7 +28,9 @@ export class SwaggerParser {
   private host?: string;
   private result: any = {};
   private defRegistry?: DefinitionRegistry;
+  private client?: DiffClient;
   private swaggerMap?: Map<string, any>;
+  private currentPath?: string[];
 
   /**
    * Creates a new SwaggerParser instance asynchronously.
@@ -44,6 +47,7 @@ export class SwaggerParser {
     const pathMap = await loadPaths(forceArray(paths), rootPath, client.args);
     parser.defRegistry = new DefinitionRegistry(pathMap, client);
     parser.swaggerMap = pathMap;
+    parser.client = client;
     return parser;
   }
 
@@ -55,6 +59,7 @@ export class SwaggerParser {
     if (!this.defRegistry) {
       throw new Error("Definition registry is not initialized.");
     }
+    this.currentPath = [];
     const allPathsUnsorted: any = {};
     for (const [_, data] of this.swaggerMap.entries()) {
       // Retrieve any top-level defaults that need to be normalized later on.
@@ -74,12 +79,15 @@ export class SwaggerParser {
 
       // combine the paths and x-ms-paths objects and merge into overall paths object
       const allPaths = { ...paths, ...xMsPaths };
+      this.currentPath?.push("paths");
       const newPaths = this.#parsePaths(allPaths);
       for (const [path, data] of Object.entries(newPaths)) {
         allPathsUnsorted[path] = data;
       }
+      this.currentPath?.pop();
 
       for (const [key, val] of toSorted(Object.entries(data))) {
+        this.currentPath?.push(key);
         switch (key) {
           case "swagger":
           case "info":
@@ -116,6 +124,7 @@ export class SwaggerParser {
           default:
             throw new Error(`Unhandled root key: ${key}`);
         }
+        this.currentPath?.pop();
       }
     }
     // sort all the paths and add into the result
@@ -194,6 +203,7 @@ export class SwaggerParser {
   #parseResponse(value: any): any {
     let result: any = {};
     for (const [key, val] of toSorted(Object.entries(value))) {
+      this.currentPath?.push(key);
       if (key === "headers") {
         result[key] = {};
         for (const [headerKey, headerVal] of toSorted(
@@ -205,6 +215,7 @@ export class SwaggerParser {
       } else {
         result[key] = this.#parseNode(val);
       }
+      this.currentPath?.pop();
     }
     return result;
   }
@@ -238,6 +249,7 @@ export class SwaggerParser {
   #parseResponses(value: any): any {
     let result: any = {};
     for (const [code, data] of toSorted(Object.entries(value))) {
+      this.currentPath?.push(code);
       if (code === "default") {
         // Don't expand the default response. We will handle this in a special way.
         const errorName = this.#parseErrorName(data);
@@ -252,6 +264,7 @@ export class SwaggerParser {
       } else {
         result[code] = this.#parseResponse(data);
       }
+      this.currentPath?.pop();
     }
     return result;
   }
@@ -262,6 +275,7 @@ export class SwaggerParser {
     value["consumes"] = value["consumes"] ?? this.defaultConsumes;
     value["produces"] = value["produces"] ?? this.defaultProduces;
     for (const [key, val] of toSorted(Object.entries(value))) {
+      this.currentPath?.push(key);
       if (key === "parameters") {
         // mix in any parameters from parameterized host
         const hostParams = this.parameterizedHost?.parameters ?? [];
@@ -301,6 +315,7 @@ export class SwaggerParser {
       } else {
         result[key] = this.#parseNode(value[key]);
       }
+      this.currentPath?.pop();
     }
     return result;
   }
@@ -309,7 +324,9 @@ export class SwaggerParser {
   #parseVerbs(value: any): any {
     let result: any = {};
     for (const [verb, data] of toSorted(Object.entries(value))) {
+      this.currentPath?.push(verb);
       result[verb] = this.#parseOperation(data);
+      this.currentPath?.pop();
     }
     return result;
   }
@@ -320,7 +337,10 @@ export class SwaggerParser {
     for (const [operationPath, pathData] of Object.entries(value)) {
       // normalize the path to coerce the naming convention
       const normalizedPath = this.#normalizePath(operationPath);
+      const urlEncodedPath = getUrlEncodedPath([normalizedPath])!;
+      this.currentPath?.push(urlEncodedPath);
       result[normalizedPath] = this.#parseVerbs(pathData);
+      this.currentPath?.pop();
     }
     return result;
   }
@@ -330,8 +350,10 @@ export class SwaggerParser {
     if (value.length > 0 && typeof value[0] === "object") {
       const values: any[] = [];
       for (let i = 0; i < value.length; i++) {
+        this.currentPath?.push(i.toString());
         const item = value[i];
         values.push(this.#parseNode(item));
+        this.currentPath?.pop();
       }
       return values;
     } else {
@@ -377,12 +399,18 @@ export class SwaggerParser {
           refResult.registry
         );
       }
+      this.client?.suppressions?.propagateSuppression(
+        refResult,
+        this.currentPath
+      );
       return this.#parseObject(resolved);
     }
     const result: any = {};
     // visit each key in the object in sorted order
     for (const [key, val] of toSorted(Object.entries(value))) {
+      this.currentPath?.push(key);
       result[key] = this.#parseNode(val);
+      this.currentPath?.pop();
     }
     return result;
   }

@@ -418,3 +418,29 @@ export function toSorted<T>(
 ): T[] {
   return [...array].sort(compareFn);
 }
+
+/**
+ * Convert path segments into a flatted, URL-encoded path string.
+ */
+export function getUrlEncodedPath(
+  segments: string[] | undefined
+): string | undefined {
+  if (segments === undefined) return undefined;
+  return segments.map((x: string) => encodeURIComponent(x)).join("/");
+}
+
+/**
+ * Returns the string key for the `RegistryKind` enum.
+ */
+export function getRegistryName(kind: RegistryKind): string {
+  switch (kind) {
+    case RegistryKind.Definition:
+      return "definitions";
+    case RegistryKind.Parameter:
+      return "parameters";
+    case RegistryKind.Response:
+      return "responses";
+    case RegistryKind.SecurityDefinition:
+      return "securityDefinitions";
+  }
+}

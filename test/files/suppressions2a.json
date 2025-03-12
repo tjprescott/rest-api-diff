@@ -1,0 +1,66 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "(title)",
+    "version": "0000-00-00",
+    "x-typespec-generated": [
+      {
+        "emitter": "@azure-tools/typespec-autorest"
+      }
+    ]
+  },
+  "schemes": ["https"],
+  "produces": ["application/json"],
+  "consumes": ["application/json"],
+  "tags": [],
+  "paths": {
+    "/": {
+      "put": {
+        "operationId": "Create",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Person"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "schema": {
+              "$ref": "#/definitions/Person"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Age": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "integer",
+          "format": "int16"
+        }
+      },
+      "required": ["value"]
+    },
+    "Person": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "age": {
+          "$ref": "#/definitions/Age"
+        }
+      },
+      "required": ["name", "age"]
+    }
+  },
+  "parameters": {}
+}

@@ -86,6 +86,11 @@ const args = await yargs(hideBin(process.argv))
     describe: "Print verbose output.",
     default: process.env.VERBOSE,
   })
+  .options("suppressions", {
+    type: "string",
+    describe: "Path to a YAML file containing suppressions.",
+    default: process.env.SUPPRESSIONS,
+  })
   .wrap(120)
   .parse();
 

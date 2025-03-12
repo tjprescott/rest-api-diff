@@ -5,8 +5,10 @@ import {
   parseReference,
   ReferenceMetadata,
   toSorted,
+  getRegistryName,
 } from "./util.js";
 import path from "path";
+import { DiffClient } from "./diff-client.js";
 
 /** The registry to look up the name within. */
 export enum RegistryKind {
@@ -31,26 +33,13 @@ class CollectionRegistry {
       if (subdata !== undefined) {
         for (const [name, _] of toSorted(Object.entries(subdata))) {
           const resolvedPath = getResolvedPath(filepath).replace(/\\/g, "/");
-          const pathKey = `${resolvedPath}#/${this.getRegistryName()}/${name}`;
+          const pathKey = `${resolvedPath}#/${getRegistryName(this.kind)}/${name}`;
           // we don't care about unreferenced common-types
           if (!resolvedPath.includes("common-types")) {
             this.unreferenced.add(pathKey);
           }
         }
       }
-    }
-  }
-
-  getRegistryName(): string {
-    switch (this.kind) {
-      case RegistryKind.Definition:
-        return "definitions";
-      case RegistryKind.Parameter:
-        return "parameters";
-      case RegistryKind.Response:
-        return "responses";
-      case RegistryKind.SecurityDefinition:
-        return "securityDefinitions";
     }
   }
 
@@ -75,7 +64,7 @@ class CollectionRegistry {
   countReference(path: string, name: string, kind: RegistryKind) {
     // convert backslashes to forward slashes
     path = path.replace(/\\/g, "/");
-    const pathKey = `${path}#/${this.getRegistryName()}/${name}`;
+    const pathKey = `${path}#/${getRegistryName(this.kind)}/${name}`;
     this.unreferenced.delete(pathKey);
   }
 
@@ -99,10 +88,10 @@ export class DefinitionRegistry {
   private providedPaths = new Set<string>();
   private referenceStack: string[] = [];
   private referenceMap = new Map<string, Set<string>>();
-  private currentPath: string | undefined;
-  private args: any;
+  private currentPath: string[];
+  private client: DiffClient;
 
-  constructor(map: Map<string, OpenAPIV2.Document>, args: any) {
+  constructor(map: Map<string, OpenAPIV2.Document>, client: DiffClient) {
     this.data = {
       definitions: new CollectionRegistry(
         map,
@@ -128,9 +117,9 @@ export class DefinitionRegistry {
     for (const key of map.keys()) {
       this.providedPaths.add(path.normalize(key));
     }
-    this.currentPath;
+    this.currentPath = [];
+    this.client = client;
     this.#gatherDefinitions(map);
-    this.args = args;
     this.#expandReferences();
   }
 
@@ -155,6 +144,10 @@ export class DefinitionRegistry {
           for (const [key, value] of toSorted(Object.entries(itemCopy))) {
             matchCopy[key] = value;
           }
+          this.client?.suppressions?.propagateSuppression(
+            refResult,
+            this.currentPath
+          );
           return this.#expand(matchCopy, refResult.name);
         }
       } else {
@@ -168,7 +161,9 @@ export class DefinitionRegistry {
       this.#expandDerivedClasses(item);
       this.#expandAllOf(item);
       for (const [propName, propValue] of toSorted(Object.entries(item))) {
+        this.currentPath.push(propName);
         expanded[propName] = this.#expand(propValue);
+        this.currentPath.pop();
       }
       return expanded;
     }
@@ -225,7 +220,10 @@ export class DefinitionRegistry {
         const itemVal = item[key];
         switch (key) {
           case "required":
-            base[key] = (baseVal ?? []).concat(itemVal ?? []);
+            const mergedRequired = new Set(
+              (baseVal ?? []).concat(itemVal ?? [])
+            );
+            base[key] = [...mergedRequired];
             break;
           case "properties":
             base[key] = { ...(baseVal ?? {}), ...(itemVal ?? {}) };
@@ -302,11 +300,12 @@ export class DefinitionRegistry {
 
   #expandReferencesForCollection(collection: CollectionRegistry) {
     this.referenceStack = [];
-    for (const [path, values] of collection.data.entries()) {
-      this.currentPath = path;
+    for (const [filepath, values] of collection.data.entries()) {
       for (const [key, value] of values.entries()) {
-        let expanded = this.#expand(value, key, path);
-        collection.data.get(path)!.set(key, expanded);
+        this.currentPath.push(key);
+        let expanded = this.#expand(value, key, filepath);
+        collection.data.get(filepath)!.set(key, expanded);
+        this.currentPath.pop();
       }
     }
     // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
@@ -319,10 +318,18 @@ export class DefinitionRegistry {
   }
 
   #expandReferences() {
+    this.currentPath.push("definitions");
     this.#expandReferencesForCollection(this.data.definitions);
+    this.currentPath.pop();
+    this.currentPath.push("parameters");
     this.#expandReferencesForCollection(this.data.parameters);
+    this.currentPath.pop();
+    this.currentPath.push("responses");
     this.#expandReferencesForCollection(this.data.responses);
+    this.currentPath.pop();
+    this.currentPath.push("securityDefinitions");
     this.#expandReferencesForCollection(this.data.securityDefinitions);
+    this.currentPath.pop();
   }
 
   /**

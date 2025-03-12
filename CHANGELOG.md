@@ -1,5 +1,9 @@
 # @azure-tools/rest-api-diff
 
+## 0.2.1 (TBD)
+
+- Added `--suppressions` option to point to a filing containing point suppressions of violations.
+
 ## 0.2.0 (2025-03-11)
 
 - Fixed issue where relative references would sometimes be resolved incorrectly. `--lhs-root`
