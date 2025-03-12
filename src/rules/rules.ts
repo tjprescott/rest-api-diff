@@ -52,6 +52,8 @@ import { xPropertyAddedRule } from "./x-property-added.js";
 import { xNullableChangedRule } from "./x-nullable-changed.js";
 import { xMsIdentifiersChangedRule } from "./x-ms-identifiers-added.js";
 import { xSecurityAddedRule } from "./x-security-added.js";
+import { xNextLinkNameAddedRule } from "./x-next-link-name-added.js";
+import { xMsOdataRemovedRule } from "./x-ms-odata-removed.js";
 
 /** Determines whether a diff rule applies and confirms an allowed or disallowed scenario. */
 export enum RuleResult {
@@ -128,6 +130,8 @@ export function getApplicableRules(args: any): RuleSignature[] {
     xNullableChangedRule,
     xMsIdentifiersChangedRule,
     xSecurityAddedRule,
+    xNextLinkNameAddedRule,
+    xMsOdataRemovedRule,
   ];
 
   const preserveDefinitions = args["preserve-definitions"];
