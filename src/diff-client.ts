@@ -362,7 +362,7 @@ export class DiffClient {
     // delete the tempRhsRoot if used
     if (this.tempRhsRoot) {
       console.warn(`WARN: Cleaning up temporary folder '${this.tempRhsRoot}'`);
-      fs.rmdirSync(this.tempRhsRoot, { recursive: true });
+      fs.rmSync(this.tempRhsRoot, { recursive: true });
     }
 
     // create inverse files that show only the stuff that has been pruned
