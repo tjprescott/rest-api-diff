@@ -14,5 +14,4 @@ export function xMsLongRunningOperationOptionsChangedRule(
   if (data.kind === "N" && data.rhs["final-state-via"] === "location") {
     return RuleResult.NoViolation;
   }
-  return RuleResult.FlaggedViolation;
 }

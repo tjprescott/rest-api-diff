@@ -26,5 +26,4 @@ export function xHeadersAddedRule(
   ) {
     return RuleResult.NoViolation;
   }
-  return RuleResult.FlaggedViolation;
 }

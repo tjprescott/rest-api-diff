@@ -11,10 +11,6 @@ export function xDefaultRemovedRule(
   if (!data.path) return;
   const lastPath = data.path[data.path.length - 1];
   if (lastPath === "default" && data.kind === "D") {
-    if (data.lhs === false) {
-      return RuleResult.NoViolation;
-    } else {
-      return RuleResult.FlaggedViolation;
-    }
+    if (data.lhs === false) return RuleResult.NoViolation;
   }
 }
