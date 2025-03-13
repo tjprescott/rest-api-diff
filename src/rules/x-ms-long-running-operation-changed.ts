@@ -12,7 +12,6 @@ export function xMsLongRunningOperationChangedRule(
   const lastPath = data.path[data.path.length - 1];
   if (lastPath !== "x-ms-long-running-operation") return;
   // ignore logically equivalent defaults
-  if (data.kind == "N" && data.rhs === "false") return RuleResult.NoViolation;
-  if (data.kind == "D" && data.lhs === "false") return RuleResult.NoViolation;
-  return RuleResult.FlaggedViolation;
+  if (data.kind == "N" && data.rhs == false) return RuleResult.NoViolation;
+  if (data.kind == "D" && data.lhs == false) return RuleResult.NoViolation;
 }

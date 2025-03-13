@@ -14,5 +14,4 @@ export function xMsAzureResourceChangedRule(
   if (data.kind === "D") {
     return RuleResult.NoViolation;
   }
-  return RuleResult.FlaggedViolation;
 }

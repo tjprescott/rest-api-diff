@@ -21,5 +21,4 @@ export function xMsMutabilityChangedRule(
   ) {
     return RuleResult.NoViolation;
   }
-  return RuleResult.FlaggedViolation;
 }

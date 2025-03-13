@@ -13,5 +13,4 @@ export function xNullableChangedRule(
   // ignore logically equivalent defaults
   if (data.kind == "N" && data.rhs === false) return RuleResult.NoViolation;
   if (data.kind == "D" && data.lhs === false) return RuleResult.NoViolation;
-  return RuleResult.FlaggedViolation;
 }
