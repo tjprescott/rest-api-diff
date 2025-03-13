@@ -13,5 +13,4 @@ export function xAdditionalPropertiesChangedRule(
   // Permit RHS to have an empty object here as the meaning is the same as being omitted
   if (data.kind === "N" && Object.keys(data.rhs).length === 0)
     return RuleResult.NoViolation;
-  return RuleResult.FlaggedViolation;
 }
