@@ -316,14 +316,14 @@ export class DiffClient {
   hasViolations(summary: ResultSummary, preserveDefinitions: boolean): boolean {
     if (preserveDefinitions) {
       return (
-        summary.flaggedViolations > 0 ||
-        summary.assumedViolations > 0 ||
+        summary.flaggedCount > 0 ||
+        summary.assumedCount > 0 ||
         summary.unresolvedReferences > 0
       );
     } else {
       return (
-        summary.flaggedViolations > 0 ||
-        summary.assumedViolations > 0 ||
+        summary.flaggedCount > 0 ||
+        summary.assumedCount > 0 ||
         summary.unresolvedReferences > 0 ||
         summary.unreferencedObjects > 0
       );
@@ -404,7 +404,7 @@ export class DiffClient {
     const preserveDefinitions = this.args["preserve-definitions"];
 
     // Report unresolved and unreferenced objects
-    if (this.args["verbose"]) {
+    if (this.args["verbose"] == true) {
       const lhsUnreferenced = preserveDefinitions
         ? 0
         : this.lhsParser.getUnreferencedTotal();
@@ -432,7 +432,6 @@ export class DiffClient {
         }
       }
     }
-    const groupViolations = this.args["group-violations"];
     const allViolations = [
       ...(this.diffResults?.assumedViolations ?? []),
       ...(this.diffResults?.flaggedViolations ?? []),
@@ -441,9 +440,7 @@ export class DiffClient {
     // write the diff file to the file system
     if (allViolations.length !== 0) {
       const normalPath = path.join(outputFolder, "diff.json");
-      const data = groupViolations
-        ? Object.fromEntries(results.diff)
-        : results.diff;
+      const data = Object.fromEntries(results.diff);
       fs.writeFileSync(normalPath, JSON.stringify(data, null, 2));
     }
 
@@ -453,28 +450,28 @@ export class DiffClient {
       this.diffResults.suppressedViolations.length !== 0
     ) {
       const inversePath = path.join(outputFolder, "diff-inv.json");
-      const data = groupViolations
-        ? Object.fromEntries(results.diffInverse)
-        : results.diffInverse;
+      const data = Object.fromEntries(results.diffInverse);
       fs.writeFileSync(inversePath, JSON.stringify(data, null, 2));
     }
 
-    // add up the length of each array
-    const flaggedRulesViolated = new Set(
-      allViolations
-        .filter((x) => x.ruleName && !x.ruleName.endsWith("(AUTO)"))
-        .map((x) => x.ruleName)
-    );
-    const assumedRulesViolated = new Set(
-      allViolations
-        .filter((x) => x.ruleName && x.ruleName.endsWith("(AUTO)"))
-        .map((x) => x.ruleName)
-    );
+    let flaggedRuledViolated = new Set<string>();
+    let assumedRulesViolated = new Set<string>();
+
+    for (const violation of allViolations) {
+      if (violation.ruleName == undefined) {
+        throw new Error("Rule name should not be undefined.");
+      }
+      if (violation.ruleResult == RuleResult.FlaggedViolation) {
+        flaggedRuledViolated.add(violation.ruleName);
+      } else if (violation.ruleResult == RuleResult.AssumedViolation) {
+        assumedRulesViolated.add(violation.ruleName);
+      }
+    }
     const summary: ResultSummary = {
-      flaggedViolations: this.diffResults.flaggedViolations.length,
-      assumedViolations: this.diffResults.assumedViolations.length,
-      assumedRules: groupViolations ? assumedRulesViolated.size : undefined,
-      rulesViolated: groupViolations ? flaggedRulesViolated.size : undefined,
+      flaggedCount: this.diffResults.flaggedViolations.length,
+      assumedCount: this.diffResults.assumedViolations.length,
+      assumedRulesCount: assumedRulesViolated.size,
+      flaggedRulesCount: flaggedRuledViolated.size,
       unresolvedReferences: this.rhsParser.getUnresolvedReferences().length,
       unreferencedObjects: this.rhsParser.getUnreferencedTotal(),
       suppressedViolations: this.diffResults.suppressedViolations.length,
@@ -482,46 +479,43 @@ export class DiffClient {
 
     if (this.hasViolations(summary, preserveDefinitions)) {
       console.warn("\n== ISSUES FOUND! ==\n");
-      if (summary.flaggedViolations) {
-        if (summary.rulesViolated) {
-          console.warn(
-            `Flagged Violations: ${summary.flaggedViolations} across ${summary.rulesViolated} rules`
-          );
-        } else {
-          console.warn(`Flagged Violations: ${summary.flaggedViolations}`);
-        }
-      }
-      if (summary.assumedViolations) {
-        if (summary.assumedRules) {
-          console.warn(
-            `Assumed Violations: ${summary.assumedViolations} across ${summary.assumedRules} auto-generated groupings`
-          );
-        } else {
-          console.warn(`Assumed Violations: ${summary.assumedViolations}`);
-        }
+      const totalViolations = summary.flaggedCount + summary.assumedCount;
+      const totalGroups = summary.flaggedRulesCount + summary.assumedRulesCount;
+      console.error(
+        `Total Violations: ${totalViolations} (${totalGroups} groups)`
+      );
+      // get the first item of this.resultFiles.diff
+      const topViolation = this.resultFiles.diff.values().next().value;
+      const topViolationName = this.resultFiles.diff.keys().next().value;
+      if (topViolation) {
+        console.error(
+          `Top issue: ${topViolationName} (${topViolation.count} instances)`
+        );
       }
       if (summary.unresolvedReferences) {
-        console.warn(`Unresolved References: ${summary.unresolvedReferences}`);
-      }
-      if (!preserveDefinitions && summary.unreferencedObjects) {
-        console.warn(`Unreferenced Objects: ${summary.unreferencedObjects}`);
+        console.error(
+          `\nUnresolved References: ${summary.unresolvedReferences}`
+        );
       }
       if (summary.suppressedViolations) {
-        console.warn(`Suppressed Violations: ${summary.suppressedViolations}`);
-      }
-      console.warn("\n");
-      console.warn(
-        `See '${outputFolder}' for details. See 'lhs.json', 'rhs.json' and 'diff.json'.`
-      );
-      if (!preserveDefinitions && summary.unreferencedObjects) {
         console.warn(
-          "Running with `--preserve-defintions` will ensure those unreferenced objects are diffed and will not report the fact that they are unreferenced as a violation."
+          `\nSuppressed Violations: ${summary.suppressedViolations}`
         );
-        if (!this.args["verbose"]) {
-          console.warn(
-            "or run with `--verbose` to see more detailed information."
-          );
+      }
+      console.warn(
+        `\nSee '${outputFolder}' for details. See 'lhs.json', 'rhs.json' and 'diff.json'.`
+      );
+
+      if (!preserveDefinitions && summary.unreferencedObjects) {
+        console.warn(`\nUnreferenced Objects: ${summary.unreferencedObjects}`);
+      }
+      if (!preserveDefinitions && summary.unreferencedObjects) {
+        let message =
+          "Running with `--preserve-defintions` will ensure those unreferenced objects are diffed and will not report the fact that they are unreferenced as a violation. ";
+        if (this.args["verbose"] !== true) {
+          message += "Run with `--verbose` to see more detailed information.";
         }
+        console.warn(message);
       }
     } else {
       console.info(`\n== NO ISSUES FOUND! ==\n`);
@@ -698,9 +692,6 @@ export class DiffClient {
   }
 
   #buildDiffFile(diffs: DiffItem[]): any {
-    if (!this.args["group-violations"]) {
-      return this.#flattenPaths(diffs);
-    }
     const groupedDiff: { [key: string]: DiffGroupingResult } = {};
     for (const diff of diffs) {
       diff.ruleName =
@@ -798,10 +789,10 @@ interface ResultFiles {
 }
 
 interface ResultSummary {
-  flaggedViolations: number;
-  rulesViolated: number | undefined;
-  assumedViolations: number;
-  assumedRules: number | undefined;
+  flaggedCount: number;
+  flaggedRulesCount: number;
+  assumedCount: number;
+  assumedRulesCount: number;
   unresolvedReferences: number;
   unreferencedObjects: number;
   suppressedViolations: number;

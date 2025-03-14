@@ -2,7 +2,7 @@
 
 ## 0.2.2 (TBD)
 
-- Stuff
+- Removed `--group-violations` options. Grouping is now always performed.
 
 ## 0.2.1 (2025-04-09)
 
