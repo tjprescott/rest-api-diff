@@ -8,9 +8,9 @@ import os from "os";
 import path from "path";
 import { Diff } from "deep-diff";
 
-it("config should group violations when --group-violations is set", async () => {
+it("config should group violations", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
-  const args = { "group-violations": true, "output-folder": tempDir };
+  const args = { "output-folder": tempDir };
   const config: DiffClientConfig = {
     lhs: ["test/files/test2a.json"],
     rhs: ["test/files/test2b.json"],
@@ -75,11 +75,10 @@ it("config should flatten paths when --flatten-paths is set", async () => {
   );
 });
 
-it("config should flatten paths when --flatten-paths and --group-violations is set", async () => {
+it("config should flatten paths when --flatten-paths is set", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
   const args = {
     "flatten-paths": true,
-    "group-violations": true,
     "output-folder": tempDir,
   };
   const config: DiffClientConfig = {
@@ -100,29 +99,6 @@ it("config should flatten paths when --flatten-paths and --group-violations is s
   expect(items[0].diff.path).toEqual(
     "paths/%2F/get/responses/200/schema/properties/age/format"
   );
-});
-
-it("config should not group violations when --group-violations is not set", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-output-"));
-  const args = { "output-folder": tempDir };
-  const config: DiffClientConfig = {
-    lhs: ["test/files/test1a.json"],
-    rhs: ["test/files/test1b.json"],
-    args: args,
-    rules: getApplicableRules(args),
-  };
-  const client = await TestableDiffClient.create(config);
-  client.parse();
-  client.processDiff();
-  client.buildOutput();
-  client.writeOutput();
-
-  const filePath = path.join(tempDir, "diff-inv.json");
-  const diffInvFile = JSON.parse(fs.readFileSync(filePath, "utf8"));
-  expect((diffInvFile as Array<any>).length).toBe(4);
-  for (const item of diffInvFile as Array<any>) {
-    expect(item.ruleName).toEqual("ignoreSwaggerPropertiesRule");
-  }
 });
 
 it("should compare two files", async () => {

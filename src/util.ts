@@ -354,12 +354,14 @@ async function compileTypespec(
     const version = args["typespec-version-selector"];
     options.push(`--option=@azure-tools/typespec-autorest.version=${version}`);
   }
-  if (args["verbose"]) {
+  if (args["verbose"] == true) {
     options.push("--trace=@azure-tools/typespec-autorest");
   }
   const command = `${tspCommand} compile ${path} --emit=@azure-tools/typespec-autorest ${options.join(" ")}`;
   const result = await new Promise((resolve, reject) => {
-    console.log(`Running: ${command}`);
+    if (args["verbose"] == true) {
+      console.log(`Running: ${command}`);
+    }
     exec(command, (error: any, stdout: any, stderr: any) => {
       if (error) {
         const errMessage = stdout === "" ? error : stdout;
@@ -367,7 +369,9 @@ async function compileTypespec(
           `${errMessage}\nError occurred while compiling TypeSpec!`
         );
       }
-      console.log(stdout);
+      if (args["verbose"] == true) {
+        console.log(stdout);
+      }
       resolve(stdout);
     });
   });
