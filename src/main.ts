@@ -6,7 +6,7 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-export const epilogue = `This tool is under active development. If you experience issues or have questions, please contact Travis Prescott directly (trpresco@microsoft.com). [Tool version: ${VERSION}]`;
+export const epilogue = `\nThis tool is under active development. If you experience issues or have questions, please contact Travis Prescott directly (trpresco@microsoft.com). [Tool version: ${VERSION}]`;
 
 const args = await yargs(hideBin(process.argv))
   .usage("Usage: $0 --lhs [path...] --rhs [path...]")
@@ -45,12 +45,6 @@ const args = await yargs(hideBin(process.argv))
     describe:
       "If TypeSpec files are found, attempt to compile the TypeSpec to Swagger using @typespec-autorest.",
     default: process.env.COMPILE_TSP,
-  })
-  .options("group-violations", {
-    type: "boolean",
-    describe:
-      "Group violations by rule name. Assumed violations will be grouped into generated groups with the '(AUTO)' suffix. Otherwise, will output all violations in a flat collection.",
-    default: process.env.GROUP_VIOLATIONS,
   })
   .options("output-folder", {
     type: "string",

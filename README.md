@@ -11,7 +11,7 @@ against the one generated from TypeSpec to determine if the TypeSpec accurately 
 
 ## Usage
 
-1. Run `npx rest-api-diff --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp] [--group-violations]` or `npx rest-api-diff` if you are using a `.env` file (Recommended)
+1. Run `npx rest-api-diff --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp]` or `npx rest-api-diff` if you are using a `.env` file (Recommended)
 
 ## Dev Install
 
@@ -22,7 +22,7 @@ against the one generated from TypeSpec to determine if the TypeSpec accurately 
 ## Dev Usage
 
 1. Run `npm run build` to build the tool. Alternatively, run `npm run watch` in a separate terminal so that changes to the TypeScript files are automatically re-compiled (RECOMMENDED).
-2. Run `npm run rest-api-diff -- --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp] [--group-violations]` or `npm run rest-api-diff` if you are using a `.env` file (Recommended)
+2. Run `npm run rest-api-diff -- --lhs <lhs_path> --rhs <rhs_path> [--compile-tsp]` or `npm run rest-api-diff` if you are using a `.env` file (Recommended)
 
 `lhs_path` and `rhs_path` are the paths to the Swagger specifications to compare, or the folders
 containing them. If the paths are folders, the tool will search for all Swagger files in that folder,
@@ -39,10 +39,6 @@ references as if it had been generated in the "correct" folder. This allows the 
 - `--compile-tsp`: The tool will attempt to compile TypeSpec files to Swagger using the
   `@azure-tools/autorest` emitter. If existing Swagger files are found, they will be overwritten
   by the compilation.
-- `--group-violations`: The tool will group violations by rule within `diff.json`, rather than
-  listing them as a flat collection. It will include a count of violations and the file will
-  be sorted in descending order by count. Assumed violations will be automatically grouped into
-  generated groups with the '(AUTO)' suffix.
 - `--output-folder`: The folder to write the output files to. If not specified, the output will be
   written to `./output`. The output folder is cleared with each run.
 - `--typespec-compiler-path`: The path to the `@typespec/compiler` package. If not specified, the
@@ -89,7 +85,7 @@ The output artifacts are:
 You can run a visual diff on `lhs.json` and `rhs.json` to visually see the differences that should appear in `diff.json`.
 ![diff](https://github.com/tjprescott/openapi-diff/assets/5723682/ac4ec19d-88fc-4673-8fa9-cc926d63744c)
 
-`diff.json` contains each specific diff that was found between the two specifications and was not resolved by a rule.
+`diff.json` contains each specific diff that was found between the two specifications and was not resolved by a rule. The tool will group violations by their rule name (if applicable) or by auto-generated groups with the '(AUTO)' suffix. It will include a count of violations and the file will be sorted in descending order by count.
 
 The schema of the diff object:
 

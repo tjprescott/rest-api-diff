@@ -3,6 +3,7 @@
 ## 0.2.1 (TBD)
 
 - Added `--suppressions` option to point to a file containing point suppressions of violations.
+- Removed `--group-violations` options. Grouping is now always performed.
 
 ## 0.2.0 (2025-03-11)
 
