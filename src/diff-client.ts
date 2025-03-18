@@ -535,6 +535,9 @@ export class DiffClient {
         `See '${outputFolder}' for details. You may still want to compare 'lhs-inv.json' and 'rhs-inv.json' to check that the differences reflected are truly irrelevant.`
       );
     }
+    console.error(
+      "Note that this build has a temporary workaround in place suppressing issues related to the SubResourceReadOnly. Even if no issues are reported, this issue is unresolved!"
+    );
   }
 
   /**

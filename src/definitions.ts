@@ -180,10 +180,38 @@ export class DefinitionRegistry {
   }
 
   #expandDerivedClasses(base: any): any {
-    const derivedClasses = base.$derivedClasses;
+    let derivedClasses = base.$derivedClasses;
     delete base.$derivedClasses;
     if (!derivedClasses) {
       return base;
+    }
+    // FIXME: This is a MASSIVELY hacky workaround for Compute!  This should absolutely
+    // be removed once the underlying issue is fixed!
+    const fingerprint = [
+      "DiskRestorePointAttributes",
+      "VirtualMachineScaleSetExtension",
+      "VirtualMachineScaleSetExtensionUpdate",
+      "VirtualMachineScaleSetVMExtension",
+      "VirtualMachineScaleSetVMExtensionUpdate",
+    ];
+    if (fingerprint.length === derivedClasses.length) {
+      let match = true;
+      for (let i = 0; i < fingerprint.length; i++) {
+        if (!derivedClasses[i].endsWith(fingerprint[i])) {
+          match = false;
+          break;
+          0;
+        }
+      }
+      if (match) {
+        // the ugly workaround is here. Ignore the two classes that should
+        // inherit from SubResourceReadOnly but don't.
+        derivedClasses = [
+          derivedClasses[0],
+          derivedClasses[2],
+          derivedClasses[4],
+        ];
+      }
     }
     const anyOf = [];
     for (const derived of derivedClasses) {
