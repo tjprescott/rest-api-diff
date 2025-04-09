@@ -1,0 +1,63 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "(title)",
+    "version": "0000-00-00",
+    "x-typespec-generated": [
+      {
+        "emitter": "@azure-tools/typespec-autorest"
+      }
+    ]
+  },
+  "schemes": ["https"],
+  "produces": ["application/json"],
+  "consumes": ["application/json"],
+  "tags": [],
+  "paths": {},
+  "definitions": {
+    "Polygon": {
+      "type": "object",
+      "properties": {
+        "sides": {
+          "type": "integer",
+          "format": "int16"
+        }
+      },
+      "required": ["sides"],
+      "allOf": [
+        {
+          "$ref": "#/definitions/Shape"
+        }
+      ]
+    },
+    "Quadrilateral": {
+      "type": "object",
+      "properties": {
+        "length": {
+          "type": "integer",
+          "format": "int16"
+        },
+        "width": {
+          "type": "integer",
+          "format": "int16"
+        }
+      },
+      "required": ["length", "width"],
+      "allOf": [
+        {
+          "$ref": "#/definitions/Polygon"
+        }
+      ]
+    },
+    "Shape": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["name"]
+    }
+  },
+  "parameters": {}
+}

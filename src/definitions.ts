@@ -120,6 +120,7 @@ export class DefinitionRegistry {
     this.currentPath = [];
     this.client = client;
     this.#gatherDefinitions(map);
+    this.#expandInheritanceChains();
     this.#expandReferences();
   }
 
@@ -302,6 +303,7 @@ export class DefinitionRegistry {
     this.referenceStack = [];
     for (const [filepath, values] of collection.data.entries()) {
       for (const [key, value] of values.entries()) {
+        console.log(key);
         this.currentPath.push(key);
         let expanded = this.#expand(value, key, filepath);
         collection.data.get(filepath)!.set(key, expanded);
@@ -417,9 +419,12 @@ export class DefinitionRegistry {
         this.data.securityDefinitions.add(path, name, data);
       }
     }
+  }
+
+  #expandInheritanceChains() {
     // ensure each base class has a list of derived classes for use
     // when interpretting allOf.
-    for (const [ref, set] of this.polymorphicMap.entries()) {
+    for (const [ref, derived_set] of this.polymorphicMap.entries()) {
       const refResult = parseReference(ref);
       if (!refResult) {
         throw new Error(`Could not parse reference: ${ref}`);
@@ -429,7 +434,17 @@ export class DefinitionRegistry {
         this.logUnresolvedReference(ref);
         continue;
       }
-      baseClass["$derivedClasses"] = Array.from(set);
+      // check if refKey also has derived classes and combine them
+      for (const derived of derived_set) {
+        const derivedRef = parseReference(derived)!.expandedRef;
+        const match = this.polymorphicMap.get(derivedRef);
+        if (match !== undefined) {
+          for (const item of match) {
+            derived_set.add(item);
+          }
+        }
+      }
+      baseClass["$derivedClasses"] = Array.from(derived_set);
     }
   }
 

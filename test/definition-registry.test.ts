@@ -158,3 +158,24 @@ it("should ignore example references", async () => {
     expect(ref.includes("examples")).toBe(false);
   }
 });
+
+it("expands inheritance chains", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/inheritanceChain.json"],
+    rhs: ["test/files/inheritanceChain.json"],
+    args: {},
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  const [parser, _] = client.getParsers();
+  const defRegistry = getDefinitionRegistry(parser).getCollection(
+    RegistryKind.Definition
+  );
+  let filePath = Object.keys(defRegistry)[0];
+  let quad = defRegistry[filePath].get("Quadrilateral");
+  let expected_properties = ["length", "width", "sides", "name"];
+  for (const prop of expected_properties) {
+    expect(quad.properties).toHaveProperty(prop);
+  }
+});
