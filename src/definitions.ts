@@ -122,6 +122,7 @@ export class DefinitionRegistry {
     this.#gatherDefinitions(map);
     this.#expandInheritanceChains();
     this.#expandReferences();
+    this.#removeAllOf();
   }
 
   #expandObject(item: any): any {
@@ -463,6 +464,20 @@ export class DefinitionRegistry {
         }
       }
       baseClass["$derivedClasses"] = Array.from(derived_set);
+    }
+  }
+
+  /** Remove allOf properties from the definitions. */
+  #removeAllOf() {
+    for (const [_, values] of this.data.definitions.data.entries()) {
+      for (const [_, value] of values) {
+        delete value.allOf;
+      }
+    }
+    for (const [_, values] of this.data.parameters.data.entries()) {
+      for (const [_, value] of values) {
+        delete value.allOf;
+      }
     }
   }
 

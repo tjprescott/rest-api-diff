@@ -173,9 +173,9 @@ it("expands inheritance chains", async () => {
     RegistryKind.Definition
   );
   let filePath = Object.keys(defRegistry)[0];
-  let quad = defRegistry[filePath].get("D");
+  let d = defRegistry[filePath].get("D");
   let expected_properties = ["aProp", "bProp", "cProp", "dProp"];
   for (const prop of expected_properties) {
-    expect(quad.properties).toHaveProperty(prop);
+    expect(d.properties).toHaveProperty(prop);
   }
 });
