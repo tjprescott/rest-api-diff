@@ -3,6 +3,7 @@
 ## 0.2.2 (TBD)
 
 - Removed `--group-violations` options. Grouping is now always performed.
+- Fixed issue where `allOf` was not removed from the output.
 
 ## 0.2.1 (2025-04-09)
 
