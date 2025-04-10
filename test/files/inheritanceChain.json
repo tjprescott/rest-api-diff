@@ -15,48 +15,56 @@
   "tags": [],
   "paths": {},
   "definitions": {
-    "Polygon": {
+    "A": {
       "type": "object",
       "properties": {
-        "sides": {
-          "type": "integer",
-          "format": "int16"
-        }
-      },
-      "required": ["sides"],
-      "allOf": [
-        {
-          "$ref": "#/definitions/Shape"
-        }
-      ]
-    },
-    "Quadrilateral": {
-      "type": "object",
-      "properties": {
-        "length": {
-          "type": "integer",
-          "format": "int16"
-        },
-        "width": {
-          "type": "integer",
-          "format": "int16"
-        }
-      },
-      "required": ["length", "width"],
-      "allOf": [
-        {
-          "$ref": "#/definitions/Polygon"
-        }
-      ]
-    },
-    "Shape": {
-      "type": "object",
-      "properties": {
-        "name": {
+        "aProp": {
           "type": "string"
         }
       },
-      "required": ["name"]
+      "required": ["aProp"]
+    },
+    "B": {
+      "type": "object",
+      "properties": {
+        "bProp": {
+          "type": "string"
+        }
+      },
+      "required": ["bProp"],
+      "allOf": [
+        {
+          "$ref": "#/definitions/A"
+        }
+      ]
+    },
+    "C": {
+      "type": "object",
+      "properties": {
+        "cProp": {
+          "type": "string"
+        }
+      },
+      "required": ["cProp"],
+      "allOf": [
+        {
+          "$ref": "#/definitions/B"
+        }
+      ]
+    },
+    "D": {
+      "type": "object",
+      "properties": {
+        "dProp": {
+          "type": "string"
+        }
+      },
+      "required": ["dProp"],
+      "allOf": [
+        {
+          "$ref": "#/definitions/C"
+        }
+      ]
     }
   },
   "parameters": {}

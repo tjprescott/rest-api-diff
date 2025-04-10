@@ -27,14 +27,17 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Install pnpm
+        run: npm install -g pnpm
+
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: List installed packages
-        run: npm ls -a
+        run: pnpm list --depth Infinity
 
       - name: Build project
-        run: npm run build
+        run: pnpm build
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
