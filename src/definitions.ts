@@ -120,6 +120,7 @@ export class DefinitionRegistry {
     this.currentPath = [];
     this.client = client;
     this.#gatherDefinitions(map);
+    this.#expandInheritanceChains();
     this.#expandReferences();
   }
 
@@ -203,7 +204,7 @@ export class DefinitionRegistry {
 
   #expandAllOf(base: any): any {
     const allOf = base.allOf;
-    delete base.allOf;
+
     if (allOf === undefined) {
       return base;
     }
@@ -417,9 +418,31 @@ export class DefinitionRegistry {
         this.data.securityDefinitions.add(path, name, data);
       }
     }
-    // ensure each base class has a list of derived classes for use
-    // when interpretting allOf.
-    for (const [ref, set] of this.polymorphicMap.entries()) {
+  }
+
+  /**
+   * Ensures inheritance chains are expanded for polymorphic references in the `polymorphicMap`.
+   * This is to ensure than an inheritance chain A > B > C is fully expanded to reflect
+   * that both B and C are derived from A.
+   *
+   * This method iterates through all entries in the `polymorphicMap`, which maps references
+   * to their derived classes. For each key in the map, it:
+   * 1. Retrieves the base class associated with the reference key.
+   * 2. Logs an unresolved reference if the base class cannot be found.
+   * 3. Checks if any derived classes of the reference also have their own derived classes
+   *    and combines them into the current set of derived classes.
+   * 4. Updates the base class with a `$derivedClasses` property containing the complete
+   *    set of derived classes.
+   *
+   * Throws:
+   * - An `Error` if a reference cannot be parsed.
+   *
+   * Side Effects:
+   * - Updates the `$derivedClasses` property of base classes in the `polymorphicMap`.
+   * - Logs unresolved references using `logUnresolvedReference`.
+   */
+  #expandInheritanceChains() {
+    for (const [ref, derived_set] of this.polymorphicMap.entries()) {
       const refResult = parseReference(ref);
       if (!refResult) {
         throw new Error(`Could not parse reference: ${ref}`);
@@ -429,7 +452,17 @@ export class DefinitionRegistry {
         this.logUnresolvedReference(ref);
         continue;
       }
-      baseClass["$derivedClasses"] = Array.from(set);
+      // check if refKey also has derived classes and combine them
+      for (const derived of derived_set) {
+        const derivedRef = parseReference(derived)!.expandedRef;
+        const match = this.polymorphicMap.get(derivedRef);
+        if (match !== undefined) {
+          for (const item of match) {
+            derived_set.add(item);
+          }
+        }
+      }
+      baseClass["$derivedClasses"] = Array.from(derived_set);
     }
   }
 
