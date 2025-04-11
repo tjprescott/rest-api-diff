@@ -176,9 +176,10 @@ it("expands inheritance chains", async () => {
   let a = defRegistry[filePath].get("A");
   let d = defRegistry[filePath].get("D");
   let expected_properties = ["aProp", "bProp", "cProp", "dProp"];
+  expect(a.$anyOf).toBeDefined();
+  expect(a.$anyOf.length).toBe(3);
   for (const prop of expected_properties) {
     expect(d.properties).toHaveProperty(prop);
   }
-  expect(a.$anyOf).toBeDefined();
-  expect(a.$anyOf.length).toBe(3);
+  expect(d.$allOf).toBeUndefined();
 });

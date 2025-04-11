@@ -24,8 +24,34 @@ class InheritanceManager {
 
   constructor() {}
 
+  #isAbsolute(path: string): boolean {
+    return path.startsWith("/") || /^[a-zA-Z]:\\/.test(path);
+  }
+
   #normalizePath(path: string): string {
     return path.replace(/\\/g, "/");
+  }
+
+  /** Normalizes paths and attempts to resolve relative paths.
+   * If there is more than one matching relative path, throws
+   * an error.
+   */
+  #resolvePath(path: string): string {
+    const normPath = this.#normalizePath(path);
+    // if path is not absolute, look for a key that endsWith it and verify there is only one match
+    if (!this.#isAbsolute(normPath)) {
+      const matches = [...this.inheritanceMap.keys()].filter((key) =>
+        key.endsWith(normPath)
+      );
+      if (matches.length === 1) {
+        return matches[0];
+      } else if (matches.length > 1) {
+        throw new Error(
+          `Multiple inheritance paths found for ${normPath}: ${matches.join(", ")}`
+        );
+      }
+    }
+    return normPath;
   }
 
   /** Register a parent relationship to the provided path (i.e. the provided path derives from the parent). */
@@ -60,7 +86,7 @@ class InheritanceManager {
 
   /** Get the parent classes associated with a given path. */
   getParents(path: string): Set<string> {
-    const normPath = this.#normalizePath(path);
+    const normPath = this.#resolvePath(path);
     const metadata = this.inheritanceMap.get(normPath);
     if (metadata === undefined) {
       return new Set<string>();
@@ -70,7 +96,7 @@ class InheritanceManager {
 
   /** Get the child classes associated with a given path. */
   getChildren(path: string): Set<string> {
-    const normPath = this.#normalizePath(path);
+    const normPath = this.#resolvePath(path);
     const metadata = this.inheritanceMap.get(normPath);
     if (metadata === undefined) {
       return new Set<string>();
@@ -233,7 +259,9 @@ export class DefinitionRegistry {
     this.currentPath = [];
     this.client = client;
     this.#gatherDefinitions(map);
-    this.#expandReferences();
+    this.#expandDefinitions();
+    this.#expandOtherReferences();
+    let test = "best";
   }
 
   #expandObject(item: any): any {
@@ -271,7 +299,7 @@ export class DefinitionRegistry {
       }
     } else {
       const expanded: any = {};
-      this.#expandInheritance(item);
+      this.#addInheritanceInfo(item);
       for (const [propName, propValue] of toSorted(Object.entries(item))) {
         this.currentPath.push(propName);
         expanded[propName] = this.#expand(propValue);
@@ -291,38 +319,26 @@ export class DefinitionRegistry {
     return expanded;
   }
 
-  #expandInheritance(base: any): any {
+  #addInheritanceInfo(base: any): any {
     const path = this.currentPath.join("/");
-    const children = this.inheritance.getChildren(path);
-    const parents = this.inheritance.getParents(path);
-    let test = "best";
 
-    // const expAllOf = this.#expandArray(allOf);
-    // let allKeys = [...Object.keys(base)];
-    // for (const item of expAllOf) {
-    //   allKeys = allKeys.concat(Object.keys(item));
-    // }
-    // // eliminate duplicates
-    // allKeys = Array.from(new Set(allKeys));
-    // for (const key of allKeys) {
-    //   const baseVal = base[key];
-    //   for (const item of expAllOf) {
-    //     const itemVal = item[key];
-    //     switch (key) {
-    //       case "required":
-    //         const mergedRequired = new Set(
-    //           (baseVal ?? []).concat(itemVal ?? [])
-    //         );
-    //         base[key] = [...mergedRequired];
-    //         break;
-    //       case "properties":
-    //         base[key] = { ...(baseVal ?? {}), ...(itemVal ?? {}) };
-    //         break;
-    //       default:
-    //         break;
-    //     }
-    //   }
-    // }
+    // if children found, add them as $anyOf and expand them
+    const children = this.inheritance.getChildren(path);
+    if (children.size > 0) {
+      const anyOf = [...children].map((child) => {
+        return { $ref: child };
+      });
+      base.$anyOf = anyOf;
+    }
+
+    // if parents found, mix them into the base object
+    const parents = this.inheritance.getParents(path);
+    if (parents.size > 0) {
+      const allOf = [...parents].map((parent) => {
+        return { $ref: parent };
+      });
+      base.$allOf = allOf;
+    }
     return base;
   }
 
@@ -397,10 +413,69 @@ export class DefinitionRegistry {
     this.#expandReferenceMap();
   }
 
-  #expandReferences() {
+  #expandAllOfReferences() {
+    const collection = this.data.definitions;
+    for (const [_, values] of collection.data.entries()) {
+      for (const [_, data] of values.entries()) {
+        const allOf = data.$allOf;
+        if (allOf === undefined) {
+          continue;
+        }
+        delete data.$allOf;
+        const baseKeys = [...Object.keys(data)];
+        const allKeys = new Set([...baseKeys]);
+        for (const item of allOf) {
+          for (const itemKey of Object.keys(item)) {
+            allKeys.add(itemKey);
+          }
+          // merge 'required' and 'properties' if they exist
+          for (const key of allKeys) {
+            const baseVal = data[key];
+            const itemVal = item[key];
+            switch (key) {
+              case "required":
+                const mergedRequired = new Set(
+                  (baseVal ?? []).concat(itemVal ?? [])
+                );
+                data[key] = [...mergedRequired];
+                break;
+              case "properties":
+                data[key] = { ...(baseVal ?? {}), ...(itemVal ?? {}) };
+                break;
+              default:
+                break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #expandAnyOfReferences() {
+    const collection = this.data.definitions;
+    for (const [_, values] of collection.data.entries()) {
+      for (const [_, data] of values.entries()) {
+        const anyOf = data.$anyOf;
+        if (anyOf === undefined) {
+          continue;
+        }
+        for (const item of anyOf) {
+          // FIXME: Need to re-lookup the reference... but the reference has already been expanded
+          let test = "best";
+        }
+      }
+    }
+  }
+
+  #expandDefinitions() {
     this.currentPath.push("definitions");
     this.#expandReferencesForCollection(this.data.definitions);
+    this.#expandAllOfReferences();
+    this.#expandAnyOfReferences();
     this.currentPath.pop();
+  }
+
+  #expandOtherReferences() {
     this.currentPath.push("parameters");
     this.#expandReferencesForCollection(this.data.parameters);
     this.currentPath.pop();
