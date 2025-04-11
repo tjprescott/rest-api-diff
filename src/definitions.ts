@@ -10,6 +10,73 @@ import {
 import path from "path";
 import { DiffClient } from "./diff-client.js";
 
+interface InheritanceMetadata {
+  /** And child classes that derive from this class */
+  children: Set<string>;
+  /** Any parent classes this class derives from */
+  parents: Set<string>;
+}
+
+/** Track parent/child relationships among the various classes. */
+class InheritanceManager {
+  /** The inheritance map. */
+  private inheritanceMap = new Map<string, InheritanceMetadata>();
+
+  constructor() {}
+
+  #normalizePath(path: string): string {
+    return path.replace(/\\/g, "/");
+  }
+
+  /** Register a parent relationship to the provided path (i.e. the provided path derives from the parent). */
+  registerParent(path: string, parent: string) {
+    const normPath = this.#normalizePath(path);
+    const metadata = this.inheritanceMap.get(normPath);
+    if (metadata === undefined) {
+      this.inheritanceMap.set(normPath, {
+        children: new Set<string>(),
+        parents: new Set<string>([parent]),
+      });
+    } else {
+      metadata.parents.add(parent);
+    }
+  }
+
+  /** Register a child relationship to the provided path (i.e. the child derives from the given path) */
+  registerChild(path: string, child: string) {
+    const normPath = this.#normalizePath(path);
+    const metadata = this.inheritanceMap.get(normPath);
+    if (metadata === undefined) {
+      this.inheritanceMap.set(normPath, {
+        children: new Set<string>([child]),
+        parents: new Set<string>(),
+      });
+    } else {
+      metadata.children.add(child);
+    }
+  }
+
+  /** Get the parent classes associated with a given path. */
+  getParents(path: string): Set<string> {
+    const normPath = this.#normalizePath(path);
+    const metadata = this.inheritanceMap.get(normPath);
+    if (metadata === undefined) {
+      return new Set<string>();
+    }
+    return metadata.parents;
+  }
+
+  /** Get the child classes associated with a given path. */
+  getChildren(path: string): Set<string> {
+    const normPath = this.#normalizePath(path);
+    const metadata = this.inheritanceMap.get(normPath);
+    if (metadata === undefined) {
+      return new Set<string>();
+    }
+    return metadata.children;
+  }
+}
+
 /** The registry to look up the name within. */
 export enum RegistryKind {
   Definition,
@@ -82,14 +149,13 @@ export class DefinitionRegistry {
     responses: CollectionRegistry;
     securityDefinitions: CollectionRegistry;
   };
-  /** The key is the parent class and the values are the set of child classes that derive from the parent. */
-  private polymorphicMap = new Map<string, Set<string>>();
   private unresolvedReferences = new Set<string>();
   private providedPaths = new Set<string>();
   private referenceStack: string[] = [];
   private referenceMap = new Map<string, Set<string>>();
   private currentPath: string[];
   private client: DiffClient;
+  private inheritance: InheritanceManager = new InheritanceManager();
 
   constructor(map: Map<string, OpenAPIV2.Document>, client: DiffClient) {
     this.data = {
@@ -120,9 +186,7 @@ export class DefinitionRegistry {
     this.currentPath = [];
     this.client = client;
     this.#gatherDefinitions(map);
-    this.#expandInheritanceChains();
     this.#expandReferences();
-    this.#removeAllOf();
   }
 
   #expandObject(item: any): any {
@@ -205,7 +269,7 @@ export class DefinitionRegistry {
 
   #expandAllOf(base: any): any {
     const allOf = base.allOf;
-
+    delete base.allOf;
     if (allOf === undefined) {
       return base;
     }
@@ -285,7 +349,7 @@ export class DefinitionRegistry {
       set.add(value);
       const references = this.referenceMap.get(value);
       this.#expandSetWithItems(set, references);
-      const derived = this.polymorphicMap.get(value);
+      const derived = this.inheritance.getChildren(value);
       this.#expandSetWithItems(set, derived);
     }
   }
@@ -294,7 +358,7 @@ export class DefinitionRegistry {
     for (const [key, values] of this.referenceMap.entries()) {
       const expanded = new Set<string>();
       this.#expandSetWithItems(expanded, values);
-      const derivedClasses = this.polymorphicMap.get(key);
+      const derivedClasses = this.inheritance.getChildren(key);
       this.#expandSetWithItems(expanded, derivedClasses);
       this.referenceMap.set(key, expanded);
     }
@@ -353,14 +417,9 @@ export class DefinitionRegistry {
         throw new Error(`Could not parse reference: ${ref}`);
       }
       allOf[0].$ref = refResult.expandedRef;
-      const set = this.polymorphicMap.get(refResult.expandedRef);
       let pathKey = `${filePath}#/${this.getRegistryName(refResult.registry)}/${key}`;
-      pathKey = pathKey.replace(/\\/g, "/");
-      if (set === undefined) {
-        this.polymorphicMap.set(refResult.expandedRef, new Set([pathKey]));
-      } else {
-        set.add(pathKey);
-      }
+      this.inheritance.registerParent(pathKey, refResult.expandedRef);
+      this.inheritance.registerChild(refResult.expandedRef, pathKey);
     } else if (allOf) {
       // allOf is listing properties to mix-in
       throw new Error(
@@ -417,66 +476,6 @@ export class DefinitionRegistry {
         Object.entries(fileData.securityDefinitions ?? {})
       )) {
         this.data.securityDefinitions.add(path, name, data);
-      }
-    }
-  }
-
-  /**
-   * Ensures inheritance chains are expanded for polymorphic references in the `polymorphicMap`.
-   * This is to ensure than an inheritance chain A > B > C is fully expanded to reflect
-   * that both B and C are derived from A.
-   *
-   * This method iterates through all entries in the `polymorphicMap`, which maps references
-   * to their derived classes. For each key in the map, it:
-   * 1. Retrieves the base class associated with the reference key.
-   * 2. Logs an unresolved reference if the base class cannot be found.
-   * 3. Checks if any derived classes of the reference also have their own derived classes
-   *    and combines them into the current set of derived classes.
-   * 4. Updates the base class with a `$derivedClasses` property containing the complete
-   *    set of derived classes.
-   *
-   * Throws:
-   * - An `Error` if a reference cannot be parsed.
-   *
-   * Side Effects:
-   * - Updates the `$derivedClasses` property of base classes in the `polymorphicMap`.
-   * - Logs unresolved references using `logUnresolvedReference`.
-   */
-  #expandInheritanceChains() {
-    for (const [ref, derived_set] of this.polymorphicMap.entries()) {
-      const refResult = parseReference(ref);
-      if (!refResult) {
-        throw new Error(`Could not parse reference: ${ref}`);
-      }
-      const baseClass = this.get(refResult);
-      if (baseClass === undefined) {
-        this.logUnresolvedReference(ref);
-        continue;
-      }
-      // check if refKey also has derived classes and combine them
-      for (const derived of derived_set) {
-        const derivedRef = parseReference(derived)!.expandedRef;
-        const match = this.polymorphicMap.get(derivedRef);
-        if (match !== undefined) {
-          for (const item of match) {
-            derived_set.add(item);
-          }
-        }
-      }
-      baseClass["$derivedClasses"] = Array.from(derived_set);
-    }
-  }
-
-  /** Remove allOf properties from the definitions. */
-  #removeAllOf() {
-    for (const [_, values] of this.data.definitions.data.entries()) {
-      for (const [_, value] of values) {
-        delete value.allOf;
-      }
-    }
-    for (const [_, values] of this.data.parameters.data.entries()) {
-      for (const [_, value] of values) {
-        delete value.allOf;
       }
     }
   }
