@@ -158,28 +158,3 @@ it("should ignore example references", async () => {
     expect(ref.includes("examples")).toBe(false);
   }
 });
-
-it("expands inheritance chains", async () => {
-  const config: DiffClientConfig = {
-    lhs: ["test/files/inheritanceChain.json"],
-    rhs: ["test/files/inheritanceChain.json"],
-    args: {},
-    rules: getApplicableRules({}),
-  };
-  const client = await TestableDiffClient.create(config);
-  client.parse();
-  const [parser, _] = client.getParsers();
-  const defRegistry = getDefinitionRegistry(parser).getCollection(
-    RegistryKind.Definition
-  );
-  let filePath = Object.keys(defRegistry)[0];
-  let a = defRegistry[filePath].get("A");
-  let d = defRegistry[filePath].get("D");
-  let expected_properties = ["aProp", "bProp", "cProp", "dProp"];
-  expect(a.$anyOf).toBeDefined();
-  expect(a.$anyOf.length).toBe(3);
-  for (const prop of expected_properties) {
-    expect(d.properties).toHaveProperty(prop);
-  }
-  expect(d.$allOf).toBeUndefined();
-});

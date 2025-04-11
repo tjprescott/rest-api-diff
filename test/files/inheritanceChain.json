@@ -13,7 +13,22 @@
   "produces": ["application/json"],
   "consumes": ["application/json"],
   "tags": [],
-  "paths": {},
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "Foo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "schema": {
+              "$ref": "#/definitions/C"
+            }
+          }
+        }
+      }
+    }
+  },
   "definitions": {
     "A": {
       "type": "object",
