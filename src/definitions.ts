@@ -31,28 +31,30 @@ class InheritanceManager {
   /** Register a parent relationship to the provided path (i.e. the provided path derives from the parent). */
   registerParent(path: string, parent: string) {
     const normPath = this.#normalizePath(path);
+    const parentPath = this.#normalizePath(parent);
     const metadata = this.inheritanceMap.get(normPath);
     if (metadata === undefined) {
       this.inheritanceMap.set(normPath, {
         children: new Set<string>(),
-        parents: new Set<string>([parent]),
+        parents: new Set<string>([parentPath]),
       });
     } else {
-      metadata.parents.add(parent);
+      metadata.parents.add(parentPath);
     }
   }
 
   /** Register a child relationship to the provided path (i.e. the child derives from the given path) */
   registerChild(path: string, child: string) {
     const normPath = this.#normalizePath(path);
+    const childPath = this.#normalizePath(child);
     const metadata = this.inheritanceMap.get(normPath);
     if (metadata === undefined) {
       this.inheritanceMap.set(normPath, {
-        children: new Set<string>([child]),
+        children: new Set<string>([childPath]),
         parents: new Set<string>(),
       });
     } else {
-      metadata.children.add(child);
+      metadata.children.add(childPath);
     }
   }
 
@@ -74,6 +76,51 @@ class InheritanceManager {
       return new Set<string>();
     }
     return metadata.children;
+  }
+
+  /** Recursively expand child references. */
+  #expandChildren(set: Set<string>, child: string | null): Set<string> {
+    if (child === null) {
+      return set;
+    }
+    const children = this.getChildren(child);
+    for (const child of children) {
+      set.add(child);
+      this.#expandChildren(set, child);
+    }
+    return set;
+  }
+
+  /** Recursively expand parent references. */
+  #expandParents(set: Set<string>, parent: string | null): Set<string> {
+    if (parent === null) {
+      return set;
+    }
+    const parents = this.getParents(parent);
+    for (const parent of parents) {
+      set.add(parent);
+      this.#expandParents(set, parent);
+    }
+    return set;
+  }
+
+  /** Expand any transitive parent/child relationships. For example,
+   * if C extends B and B extends A, then C will show B and A as parents,
+   * and A will show B and C as children.
+   */
+  resolveInheritanceChains() {
+    for (const [key, data] of this.inheritanceMap.entries()) {
+      const children = this.getChildren(key);
+      for (const child of children) {
+        this.#expandChildren(children, child);
+      }
+      const parents = this.getParents(key);
+      for (const parent of parents) {
+        this.#expandParents(parents, parent);
+      }
+      data.children = children;
+      data.parents = parents;
+    }
   }
 }
 
@@ -224,8 +271,7 @@ export class DefinitionRegistry {
       }
     } else {
       const expanded: any = {};
-      this.#expandDerivedClasses(item);
-      this.#expandAllOf(item);
+      this.#expandInheritance(item);
       for (const [propName, propValue] of toSorted(Object.entries(item))) {
         this.currentPath.push(propName);
         expanded[propName] = this.#expand(propValue);
@@ -245,60 +291,38 @@ export class DefinitionRegistry {
     return expanded;
   }
 
-  #expandDerivedClasses(base: any): any {
-    const derivedClasses = base.$derivedClasses;
-    delete base.$derivedClasses;
-    if (!derivedClasses) {
-      return base;
-    }
-    const anyOf = [];
-    for (const derived of derivedClasses) {
-      const refResult = parseReference(derived);
-      if (!refResult) {
-        throw new Error(`Could not parse reference: ${derived}`);
-      }
-      const derivedClass = this.get(refResult);
-      if (derivedClass === undefined) {
-        throw new Error(`Could not resolve reference: ${derived}`);
-      }
-      anyOf.push(derivedClass);
-    }
-    base.$anyOf = anyOf;
-    return base;
-  }
+  #expandInheritance(base: any): any {
+    const path = this.currentPath.join("/");
+    const children = this.inheritance.getChildren(path);
+    const parents = this.inheritance.getParents(path);
+    let test = "best";
 
-  #expandAllOf(base: any): any {
-    const allOf = base.allOf;
-    delete base.allOf;
-    if (allOf === undefined) {
-      return base;
-    }
-    const expAllOf = this.#expandArray(allOf);
-    let allKeys = [...Object.keys(base)];
-    for (const item of expAllOf) {
-      allKeys = allKeys.concat(Object.keys(item));
-    }
-    // eliminate duplicates
-    allKeys = Array.from(new Set(allKeys));
-    for (const key of allKeys) {
-      const baseVal = base[key];
-      for (const item of expAllOf) {
-        const itemVal = item[key];
-        switch (key) {
-          case "required":
-            const mergedRequired = new Set(
-              (baseVal ?? []).concat(itemVal ?? [])
-            );
-            base[key] = [...mergedRequired];
-            break;
-          case "properties":
-            base[key] = { ...(baseVal ?? {}), ...(itemVal ?? {}) };
-            break;
-          default:
-            break;
-        }
-      }
-    }
+    // const expAllOf = this.#expandArray(allOf);
+    // let allKeys = [...Object.keys(base)];
+    // for (const item of expAllOf) {
+    //   allKeys = allKeys.concat(Object.keys(item));
+    // }
+    // // eliminate duplicates
+    // allKeys = Array.from(new Set(allKeys));
+    // for (const key of allKeys) {
+    //   const baseVal = base[key];
+    //   for (const item of expAllOf) {
+    //     const itemVal = item[key];
+    //     switch (key) {
+    //       case "required":
+    //         const mergedRequired = new Set(
+    //           (baseVal ?? []).concat(itemVal ?? [])
+    //         );
+    //         base[key] = [...mergedRequired];
+    //         break;
+    //       case "properties":
+    //         base[key] = { ...(baseVal ?? {}), ...(itemVal ?? {}) };
+    //         break;
+    //       default:
+    //         break;
+    //     }
+    //   }
+    // }
     return base;
   }
 
@@ -349,8 +373,6 @@ export class DefinitionRegistry {
       set.add(value);
       const references = this.referenceMap.get(value);
       this.#expandSetWithItems(set, references);
-      const derived = this.inheritance.getChildren(value);
-      this.#expandSetWithItems(set, derived);
     }
   }
 
@@ -358,8 +380,6 @@ export class DefinitionRegistry {
     for (const [key, values] of this.referenceMap.entries()) {
       const expanded = new Set<string>();
       this.#expandSetWithItems(expanded, values);
-      const derivedClasses = this.inheritance.getChildren(key);
-      this.#expandSetWithItems(expanded, derivedClasses);
       this.referenceMap.set(key, expanded);
     }
   }
@@ -372,12 +392,6 @@ export class DefinitionRegistry {
         let expanded = this.#expand(value, key, filepath);
         collection.data.get(filepath)!.set(key, expanded);
         this.currentPath.pop();
-      }
-    }
-    // replace $derivedClasses with $anyOf that contains the expansions of the derived classes
-    for (const [_, values] of collection.data.entries()) {
-      for (const [_, value] of values) {
-        this.#expandDerivedClasses(value);
       }
     }
     this.#expandReferenceMap();
@@ -399,27 +413,33 @@ export class DefinitionRegistry {
   }
 
   /**
-   * Checks the allOf field for a definition to do a few things:
-   * 1. If the allOf value is in an external file, add it to the list of external references so they can be loaded later.
-   * 2. Ensure the allOf $ref value is a full path rather than a relative or partial path.
-   * 3. Add the reference to the polymorphic map so that derived classes can be found later.
-   * This method will mutate the allOf data sent into it.
-   * @param allOf The allOf data to process
-   * @param key The name of the object being processed
-   * @param filePath The current filePath of the object being processed
+   * Registers any allOf references with the inheritance manager with a
+   * reciprocal relationship. So if B has an allOf reference to A, then A will
+   * register B as a child and B will register A as a parent.
    */
-  #processAllOf(allOf: any, key: string, filePath: string) {
-    if (Array.isArray(allOf) && allOf.length === 1 && isReference(allOf[0])) {
-      // allOf is targeting a base class
-      const ref = allOf[0].$ref;
-      const refResult = parseReference(ref);
-      if (!refResult) {
-        throw new Error(`Could not parse reference: ${ref}`);
+  #checkInheritance(data: any, key: string, filePath: string) {
+    const allOf = data.allOf;
+    if (allOf === undefined) {
+      return;
+    }
+    delete data.allOf;
+
+    const isArray = Array.isArray(allOf);
+    const allReferences =
+      allOf.filter((x: any) => !isReference(x)).length === 0;
+
+    if (isArray && allReferences) {
+      for (const item of allOf) {
+        const ref = item.$ref;
+        const refResult = parseReference(ref);
+        if (!refResult) {
+          throw new Error(`Could not parse reference: ${ref}`);
+        }
+        item.$ref = refResult.expandedRef;
+        let pathKey = `${filePath}#/${this.getRegistryName(refResult.registry)}/${key}`;
+        this.inheritance.registerParent(pathKey, refResult.expandedRef);
+        this.inheritance.registerChild(refResult.expandedRef, pathKey);
       }
-      allOf[0].$ref = refResult.expandedRef;
-      let pathKey = `${filePath}#/${this.getRegistryName(refResult.registry)}/${key}`;
-      this.inheritance.registerParent(pathKey, refResult.expandedRef);
-      this.inheritance.registerChild(refResult.expandedRef, pathKey);
     } else if (allOf) {
       // allOf is listing properties to mix-in
       throw new Error(
@@ -429,8 +449,7 @@ export class DefinitionRegistry {
   }
 
   #visitDefinition(filePath: string, key: string, data: any) {
-    const allOf = data.allOf;
-    this.#processAllOf(allOf, key, filePath);
+    this.#checkInheritance(data, key, filePath);
     this.data.definitions.add(filePath, key, data);
   }
 
@@ -438,8 +457,7 @@ export class DefinitionRegistry {
     if (data === undefined) {
       return;
     }
-    const allOf = data.allOf;
-    this.#processAllOf(allOf, data.name, path);
+    this.#checkInheritance(data, data.name, path);
   }
 
   #visitParameter(path: string, key: string, data: any) {
@@ -478,6 +496,7 @@ export class DefinitionRegistry {
         this.data.securityDefinitions.add(path, name, data);
       }
     }
+    this.inheritance.resolveInheritanceChains();
   }
 
   /** Get a collection. */
