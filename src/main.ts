@@ -4,7 +4,9 @@ import { VERSION } from "./version.js";
 import { DiffClient } from "./diff-client.js";
 import * as dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({
+  override: true,
+});
 
 export const epilogue = `This tool is under active development. If you experience issues or have questions, please contact Travis Prescott directly (trpresco@microsoft.com). [Tool version: ${VERSION}]`;
 
