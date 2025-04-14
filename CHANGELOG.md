@@ -1,5 +1,9 @@
 # @azure-tools/rest-api-diff
 
+## 0.2.3 (TBD)
+
+- TBD
+
 ## 0.2.2 (2025-04-14)
 
 - Reverted change for inheritance chains. This will be fixed in a future release.

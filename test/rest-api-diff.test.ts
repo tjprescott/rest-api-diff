@@ -365,3 +365,39 @@ it("should propagate suppressions for circular references", async () => {
   expect(client.diffResults?.suppressedViolations.length).toBe(2);
   expect(client.diffResults?.noViolations.length).toBe(1);
 });
+
+it("expands inheritance chains", async () => {
+  const config: DiffClientConfig = {
+    lhs: ["test/files/inheritanceChain.json"],
+    rhs: ["test/files/inheritanceChain.json"],
+    args: {},
+    rules: getApplicableRules({}),
+  };
+  const client = await TestableDiffClient.create(config);
+  client.parse();
+  const [parser, _] = client.getParsers();
+  const result = parser.asJSON();
+
+  const aKey = Object.keys(result["definitions"])[0];
+  const dKey = Object.keys(result["definitions"])[3];
+  const a = result["definitions"][aKey];
+  const d = result["definitions"][dKey];
+  const responseSchema =
+    result["paths"]["/"]["get"]["responses"]["200"]["schema"];
+
+  const expected_properties = ["aProp", "bProp", "cProp", "dProp"];
+  expect(a.$anyOf).toBeDefined();
+  expect(a.$anyOf.length).toBe(3);
+  for (const prop of expected_properties) {
+    expect(d.properties).toHaveProperty(prop);
+  }
+  expect(d.$allOf).toBeUndefined();
+
+  const expected_response_properties = ["aProp", "bProp", "cProp"];
+  expect(responseSchema.$allOf).toBeUndefined();
+  expect(responseSchema.$anyOf).toBeDefined();
+  expect(responseSchema.$anyOf.length).toBe(1);
+  for (const prop of expected_response_properties) {
+    expect(responseSchema.properties).toHaveProperty(prop);
+  }
+});
