@@ -1,8 +1,18 @@
 # @azure-tools/rest-api-diff
 
+## 0.2.3 (TBD)
+
+- TBD
+
+## 0.2.2 (2025-04-14)
+
+- Reverted change for inheritance chains. This will be fixed in a future release.
+- Removed `--group-violations`. Now violations will always be grouped.
+- `.env` file will now override cached variables set in the environment.
+
 ## 0.2.1 (2025-04-09)
 
-- Added `--suppressions` option to point to a file containing point suppressions of violations.
+- Added `--suppressions` option to point to a filing containing point suppressions of violations.
 - Fixed issue where inheritance chains were not being properly expanded.
 
 ## 0.2.0 (2025-03-11)

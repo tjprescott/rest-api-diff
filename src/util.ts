@@ -2,6 +2,7 @@ import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";
 import { exec } from "child_process";
 import path from "path";
+import { OpenAPIV2 } from "openapi-types";
 
 const referenceRegex = /"\$ref":\s*"([^"]*?\.json)(?:#([^"]*?))?"/gm;
 
@@ -443,4 +444,16 @@ export function getRegistryName(kind: RegistryKind): string {
     case RegistryKind.SecurityDefinition:
       return "securityDefinitions";
   }
+}
+
+/** Search a document for an item at a specific path
+ * @param path The path to the item
+ * @param doc The document to search
+ */
+export function getItemAtPath(path: string[], doc: OpenAPIV2.Document): any {
+  let item = doc;
+  for (const segment of path) {
+    item = (item as any)[segment];
+  }
+  return item as any;
 }

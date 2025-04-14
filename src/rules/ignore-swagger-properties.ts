@@ -15,7 +15,6 @@ const swaggerPropertiesToIgnore = [
   // Swagger properties that contribute documentation and metadata
   // but don't affect the shape of the service.
   "description",
-  "examples",
   "operationId",
   "summary",
   "title",
@@ -24,10 +23,16 @@ const swaggerPropertiesToIgnore = [
   "x-ms-client-default",
   "x-ms-client-flatten",
   "x-ms-client-name",
-  "x-ms-code-generation-settings",
   "x-ms-enum",
   "x-ms-parameter-grouping",
   "x-ms-parameter-location",
+];
+
+const swaggerArrayPropertiesToIgnore = [
+  "x-ms-examples",
+  "tags",
+  "examples",
+  "x-ms-code-generation-settings",
 ];
 
 export function ignoreSwaggerPropertiesRule(
@@ -41,6 +46,12 @@ export function ignoreSwaggerPropertiesRule(
   }
   for (const pathToIgnore of specificPathsToIgnore) {
     if (fullPath.startsWith(pathToIgnore)) {
+      return RuleResult.NoViolation;
+    }
+  }
+  const lastTwoPaths = data.path.slice(-2);
+  for (const prop of swaggerArrayPropertiesToIgnore) {
+    if (lastTwoPaths.includes(prop)) {
       return RuleResult.NoViolation;
     }
   }

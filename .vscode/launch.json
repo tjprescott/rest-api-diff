@@ -8,6 +8,14 @@
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/cmd/rest-api-diff.js",
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Extract Paths Script",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/scripts/extract-paths.mjs",
+      "cwd": "${workspaceFolder}"
     }
   ]
 }
