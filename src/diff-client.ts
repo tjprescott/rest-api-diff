@@ -54,8 +54,8 @@ export class DiffClient {
         client.args["suppressions"]
       );
     }
-    const lhsParser = await SwaggerParser.create(lhs, undefined, client);
-    const rhsParser = await SwaggerParser.create(rhs, undefined, client);
+    const lhsParser = await SwaggerParser.create(lhs, client);
+    const rhsParser = await SwaggerParser.create(rhs, client);
     client.lhsParser = lhsParser;
     client.rhsParser = rhsParser;
     return client;

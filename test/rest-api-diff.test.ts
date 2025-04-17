@@ -162,11 +162,7 @@ it("should compare two Swagger folders", async () => {
 });
 
 it("should resolve external swagger references", async () => {
-  const paths = await loadPaths(
-    ["test/files/swaggerExternalReferences"],
-    undefined,
-    {}
-  );
+  const paths = await loadPaths(["test/files/swaggerExternalReferences"], {});
   const pathKeys = toSorted([...paths.keys()]);
   const cwd = process.cwd();
   const expected = toSorted([

@@ -74,14 +74,10 @@ export function isReference(value: any): boolean {
   return Object.keys(value).includes("$ref");
 }
 
-async function loadFile(
-  filepath: string,
-  rootPath: string | undefined,
-  args: any
-): Promise<Map<string, any>> {
+async function loadFile(filepath: string): Promise<Map<string, any>> {
   const contents = new Map<string, any>();
   if (filepath.endsWith(".json")) {
-    const swaggerContent = await loadSwaggerFile(filepath, rootPath);
+    const swaggerContent = await loadSwaggerFile(filepath);
     if (!swaggerContent) {
       throw new Error(`No Swagger content in file: ${filepath}`);
     }
@@ -94,7 +90,6 @@ async function loadFile(
 
 export async function loadPaths(
   paths: string[],
-  rootPath: string | undefined,
   args: any
 ): Promise<Map<string, any>> {
   const jsonContents = new Map<string, any>();
@@ -108,17 +103,17 @@ export async function loadPaths(
     let values: Map<string, any>;
 
     if (stats.isDirectory()) {
-      const swaggerValues = await loadFolder(p, rootPath);
+      const swaggerValues = await loadFolder(p);
       if (!swaggerValues) {
         throw new Error(`No Swagger files found: ${p}`);
       }
       values = swaggerValues;
     } else {
-      values = await loadFile(p, rootPath, args);
+      values = await loadFile(p);
     }
 
     for (const [key, value] of values.entries()) {
-      const fileRefs = await extractFileReferences(key, rootPath);
+      const fileRefs = await extractFileReferences(key);
       for (const ref of fileRefs) {
         refs.add(ref);
       }
@@ -133,7 +128,7 @@ export async function loadPaths(
   );
 
   if (externalPathsToLoad.length > 0) {
-    const additional = await loadPaths(externalPathsToLoad, undefined, args);
+    const additional = await loadPaths(externalPathsToLoad, args);
     for (const [k, v] of additional.entries()) {
       jsonContents.set(k, v);
     }
@@ -145,11 +140,7 @@ export async function loadPaths(
 /** Expands all references into fully-qualified ones and ensures consistent use
  * of forward slashes.
  */
-function normalizeReferences(
-  filepath: string,
-  content: string,
-  rootPath: string | undefined
-): string {
+function normalizeReferences(filepath: string, content: string): string {
   // ensure backslashes are replaced with forward slashes
   filepath = getResolvedPath(filepath).replace(/\\/g, "/");
 
@@ -157,10 +148,7 @@ function normalizeReferences(
   // Otherwise use the filepath location to resolve relative references.
   const relativeRefRegex = referenceRegex;
   let updated = content.replace(relativeRefRegex, (_, relPath, target) => {
-    const resolvedPath = getResolvedPath(relPath, rootPath ?? filepath).replace(
-      /\\/g,
-      "/"
-    );
+    const resolvedPath = getResolvedPath(relPath, filepath).replace(/\\/g, "/");
     const newRef = target ? `${resolvedPath}#${target}` : resolvedPath;
     return `"$ref": "${newRef}"`;
   });
@@ -179,13 +167,11 @@ function normalizeReferences(
  * ones. If the file is not a Swagger file, it will return undefined.
  */
 export async function loadSwaggerFile(
-  sourcePath: string,
-  rootPath: string | undefined
+  sourcePath: string
 ): Promise<any | undefined> {
   const fileContent = normalizeReferences(
     sourcePath,
-    fs.readFileSync(sourcePath, "utf-8"),
-    rootPath
+    fs.readFileSync(sourcePath, "utf-8")
   );
   try {
     const jsonContent = JSON.parse(fileContent);
@@ -209,21 +195,17 @@ export async function loadSwaggerFile(
  * @param path The path to the file.
  * @returns An array of file paths that are referenced.
  */
-export async function extractFileReferences(
-  path: string,
-  rootPath: string | undefined
-): Promise<string[]> {
+export async function extractFileReferences(path: string): Promise<string[]> {
   const visited = new Set<string>();
 
   async function extractFileReferencesInternal(
-    path: string,
-    rootPath: string | undefined
+    path: string
   ): Promise<string[]> {
     if (visited.has(path)) {
       return [];
     }
     const resultSet = new Set<string>();
-    const fileContents = JSON.stringify(await loadSwaggerFile(path, rootPath));
+    const fileContents = JSON.stringify(await loadSwaggerFile(path));
     const refMatches = [...fileContents.matchAll(referenceRegex)];
     for (const match of refMatches) {
       let matchPath = match[1];
@@ -241,24 +223,18 @@ export async function extractFileReferences(
     // use rootPath for nested references. They should use their own location to
     // resolve relative references.
     for (const childPath of resultSet) {
-      const nestedRefs = await extractFileReferencesInternal(
-        childPath,
-        undefined
-      );
+      const nestedRefs = await extractFileReferencesInternal(childPath);
       for (const ref of nestedRefs) {
         resultSet.add(ref);
       }
     }
     return [...resultSet];
   }
-  const resultSet = await extractFileReferencesInternal(path, rootPath);
+  const resultSet = await extractFileReferencesInternal(path);
   return [...resultSet];
 }
 
-async function loadFolder(
-  path: string,
-  rootPath: string | undefined
-): Promise<Map<string, any> | undefined> {
+async function loadFolder(path: string): Promise<Map<string, any> | undefined> {
   const jsonContents = new Map<string, any>();
   const pathsToLoad = fs.readdirSync(path);
   for (const filePath of pathsToLoad) {
@@ -268,7 +244,7 @@ async function loadFolder(
     if (filePathStats.isDirectory()) {
       continue;
     }
-    const contents = await loadSwaggerFile(fullPath, rootPath);
+    const contents = await loadSwaggerFile(fullPath);
     if (contents) {
       jsonContents.set(fullPath, contents);
     }
