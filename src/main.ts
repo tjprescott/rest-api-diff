@@ -22,12 +22,6 @@ const args = await yargs(hideBin(process.argv))
     coerce: (arg) => arg.map(String),
     default: process.env.LHS ? process.env.LHS.split(" ") : undefined,
   })
-  .options("lhs-root", {
-    type: "string",
-    describe:
-      "The root path to use in order to resolve references in compiled LHS TypeSpec.",
-    default: process.env.LHS_ROOT,
-  })
   .options("rhs", {
     type: "array",
     demandOption: true,
@@ -35,18 +29,6 @@ const args = await yargs(hideBin(process.argv))
       "The files to compare against. Can be an array of files or directories. Directories will be crawled for JSON files. Non-Swagger files will be ignored.",
     coerce: (arg) => arg.map(String),
     default: process.env.RHS ? process.env.RHS.split(" ") : undefined,
-  })
-  .options("rhs-root", {
-    type: "string",
-    describe:
-      "The root path to use in order to resolve references in compiled RHS TypeSpec.",
-    default: process.env.RHS_ROOT,
-  })
-  .options("compile-tsp", {
-    type: "boolean",
-    describe:
-      "If TypeSpec files are found, attempt to compile the TypeSpec to Swagger using @typespec-autorest.",
-    default: process.env.COMPILE_TSP,
   })
   .options("group-violations", {
     type: "boolean",
@@ -64,18 +46,6 @@ const args = await yargs(hideBin(process.argv))
     describe:
       "Flatten paths in the output from an array of segments to a single line.",
     default: process.env.FLATTEN_PATHS,
-  })
-  .options("typespec-compiler-path", {
-    type: "string",
-    describe:
-      "The path to the TypeSpec compiler. If not provided, will use the globally installed compiler.",
-    default: process.env.TYPESPEC_COMPILER_PATH,
-  })
-  .options("typespec-version-selector", {
-    type: "string",
-    describe:
-      "For multiversion TypeSpec files, the version to generate Swagger for.",
-    default: process.env.TYPESPEC_VERSION_SELECTOR,
   })
   .options("preserve-definitions", {
     type: "boolean",

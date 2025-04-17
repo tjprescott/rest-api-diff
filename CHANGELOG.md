@@ -1,5 +1,9 @@
 # @azure-tools/rest-api-diff
 
+## 0.3.0 (TBD)
+
+- **BREAKING CHANGE** Removed all ability to compile TypeSpec files. You must now point `--lhs` and `--rhs` to Swagger ONLY.
+
 ## 0.2.2 (2025-04-14)
 
 - Reverted change for inheritance chains. This will be fixed in a future release.

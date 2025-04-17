@@ -1,6 +1,5 @@
 import { RegistryKind } from "./definitions.js";
 import * as fs from "fs";
-import { exec } from "child_process";
 import path from "path";
 
 const referenceRegex = /"\$ref":\s*"([^"]*?\.json)(?:#([^"]*?))?"/gm;
@@ -76,25 +75,19 @@ export function isReference(value: any): boolean {
 }
 
 async function loadFile(
-  path: string,
+  filepath: string,
   rootPath: string | undefined,
   args: any
 ): Promise<Map<string, any>> {
-  let contents = new Map<string, any>();
-  const compileTsp = args["compile-tsp"];
-  if (path.endsWith(".tsp") && compileTsp) {
-    contents = {
-      ...contents,
-      ...(await compileTypespec(path, rootPath, args)),
-    };
-  } else if (path.endsWith(".json")) {
-    const swaggerContent = await loadSwaggerFile(path, rootPath);
-    contents.set(path, swaggerContent);
+  const contents = new Map<string, any>();
+  if (filepath.endsWith(".json")) {
+    const swaggerContent = await loadSwaggerFile(filepath, rootPath);
+    if (!swaggerContent) {
+      throw new Error(`No Swagger content in file: ${filepath}`);
+    }
+    contents.set(filepath, swaggerContent);
   } else {
-    throw new Error(`Unsupported file type: ${path}`);
-  }
-  if (contents.size === 0) {
-    throw new Error(`No content in file: ${path}`);
+    throw new Error(`Unsupported file type: ${filepath}`);
   }
   return contents;
 }
@@ -104,48 +97,26 @@ export async function loadPaths(
   rootPath: string | undefined,
   args: any
 ): Promise<Map<string, any>> {
-  let jsonContents = new Map<string, any>();
+  const jsonContents = new Map<string, any>();
   const refs = new Set<string>();
-  for (const path of paths) {
-    if (!validatePath(path)) {
-      throw new Error(`Invalid path ${path}`);
+
+  for (const p of paths) {
+    if (!validatePath(p)) {
+      throw new Error(`Invalid path ${p}`);
     }
-    const stats = fs.statSync(path);
-    let values: Map<string, any> | undefined;
-    let compiledTypespec: boolean;
+    const stats = fs.statSync(p);
+    let values: Map<string, any>;
+
     if (stats.isDirectory()) {
-      const compileTsp = args["compile-tsp"];
-
-      // always try to load Swagger first, if it exists.
-      const swaggerValues = await loadFolder(path, rootPath);
-
-      // if compile-tsp is set, always attempt to compile TypeSpec files.
-      const typespecValues = compileTsp
-        ? await compileTypespec(path, rootPath, args)
-        : undefined;
-      compiledTypespec = typespecValues !== undefined;
-
-      if (compiledTypespec && !rootPath) {
-        throw new Error(
-          "Root path must be provided to resolve relative paths in compiled TypeSpec."
-        );
+      const swaggerValues = await loadFolder(p, rootPath);
+      if (!swaggerValues) {
+        throw new Error(`No Swagger files found: ${p}`);
       }
-      if (compileTsp) {
-        if (!typespecValues && !swaggerValues) {
-          throw new Error(`No Swagger or TypeSpec files found: ${path}`);
-        }
-        values = (typespecValues ?? swaggerValues)!;
-      } else {
-        if (!swaggerValues) {
-          throw new Error(`No Swagger files found: ${path}`);
-        }
-        values = swaggerValues;
-      }
+      values = swaggerValues;
     } else {
-      values = await loadFile(path, rootPath, args);
+      values = await loadFile(p, rootPath, args);
     }
 
-    // load the initial top-level files and extract any references
     for (const [key, value] of values.entries()) {
       const fileRefs = await extractFileReferences(key, rootPath);
       for (const ref of fileRefs) {
@@ -156,27 +127,18 @@ export async function loadPaths(
     }
   }
 
-  // remove all the paths that were already loaded
-  const resolvedKeys = [...jsonContents.keys()].map((key) =>
-    getResolvedPath(key)
+  const resolvedKeys = [...jsonContents.keys()].map((k) => getResolvedPath(k));
+  const externalPathsToLoad = [...refs].filter(
+    (k) => !resolvedKeys.includes(k)
   );
 
-  // now load any references which may themselves contain references
-  const externalPathsToLoad = [...refs].filter(
-    (key) => !resolvedKeys.includes(key)
-  );
   if (externalPathsToLoad.length > 0) {
-    // do not use rootPath for additional contents. They should use their own location to
-    // resolve relative references.
-    const additionalContents = await loadPaths(
-      externalPathsToLoad,
-      undefined,
-      args
-    );
-    for (const [key, value] of additionalContents.entries()) {
-      jsonContents.set(key, value);
+    const additional = await loadPaths(externalPathsToLoad, undefined, args);
+    for (const [k, v] of additional.entries()) {
+      jsonContents.set(k, v);
     }
   }
+
   return jsonContents;
 }
 
@@ -321,61 +283,6 @@ function validatePath(value: string): boolean {
   const resolvedPath = getResolvedPath(value);
   const stats = fs.statSync(resolvedPath);
   return stats.isFile() || stats.isDirectory();
-}
-
-/**
- * Attempts to compile TypeSpec in a given folder if no Swagger was found.
- */
-async function compileTypespec(
-  path: string,
-  rootPath: string | undefined,
-  args: any
-): Promise<Map<string, any> | undefined> {
-  const typespecOutputDir = rootPath ?? `${process.cwd()}/tsp-output`;
-  const compilerPath = args["typespec-compiler-path"];
-  const isDir = fs.statSync(path).isDirectory();
-  if (isDir) {
-    // ensure there is a typespec file in the folder
-    const files = fs.readdirSync(path);
-    const typespecFiles = files.filter((file) => file.endsWith(".tsp"));
-    if (typespecFiles.length === 0) {
-      return undefined;
-    }
-  }
-  const tspCommand = compilerPath
-    ? `node ${compilerPath}/entrypoints/cli.js`
-    : "tsp";
-  const options = [
-    `--option=@azure-tools/typespec-autorest.emitter-output-dir=${typespecOutputDir}`,
-    `--option=@azure-tools/typespec-autorest.output-file=openapi.json`,
-  ];
-  if (args["typespec-version-selector"]) {
-    const version = args["typespec-version-selector"];
-    options.push(`--option=@azure-tools/typespec-autorest.version=${version}`);
-  }
-  if (args["verbose"]) {
-    options.push("--trace=@azure-tools/typespec-autorest");
-  }
-  const command = `${tspCommand} compile ${path} --emit=@azure-tools/typespec-autorest ${options.join(" ")}`;
-  const result = await new Promise((resolve, reject) => {
-    console.log(`Running: ${command}`);
-    exec(command, (error: any, stdout: any, stderr: any) => {
-      if (error) {
-        const errMessage = stdout === "" ? error : stdout;
-        throw new Error(
-          `${errMessage}\nError occurred while compiling TypeSpec!`
-        );
-      }
-      console.log(stdout);
-      resolve(stdout);
-    });
-  });
-  if (!result) {
-    return undefined;
-  }
-  // if successful, there should be a Swagger file in the folder,
-  // so attempt to reload.
-  return await loadFolder(typespecOutputDir, rootPath);
 }
 
 /** Converts a single value or array to an array. */

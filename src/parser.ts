@@ -40,7 +40,7 @@ export class SwaggerParser {
    */
   static async create(
     paths: string | string[],
-    rootPath: string | undefined,
+    rootPath: string | undefined, // FIXME: This parameter was likely used for TypeSpec
     client: DiffClient
   ): Promise<SwaggerParser> {
     const parser = new SwaggerParser();
