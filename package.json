@@ -20,7 +20,8 @@
     "purge": "rimraf .node_modules package-lock.json",
     "test": "vitest",
     "rest-api-diff": "node cmd/rest-api-diff.js",
-    "watch": "tsc -p . --watch"
+    "watch": "tsc -p . --watch",
+    "canonical": "node src/canonical-parser.js"
   },
   "bin": {
     "rest-api-diff": "cmd/rest-api-diff.js"
@@ -55,6 +56,7 @@
   "dependencies": {
     "@azure-tools/typespec-autorest": ">=0.54.0, <1.0.0",
     "@azure-tools/typespec-azure-core": ">=0.54.0, <1.0.0",
+    "@types/js-yaml": "^4.0.9",
     "acorn": "^8.12.0",
     "acorn-walk": "^8.3.3",
     "arg": "^4.1.3",
@@ -63,6 +65,7 @@
     "diff": "^7.0.0",
     "diff2html": "^3.4.0",
     "dotenv": "^16.4.5",
+    "js-yaml": "^4.1.0",
     "make-error": "^1.3.6",
     "undici-types": "^5.26.5",
     "v8-compile-cache-lib": "^3.0.1",
