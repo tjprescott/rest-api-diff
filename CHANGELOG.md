@@ -2,7 +2,10 @@
 
 ## 0.3.0 (TBD)
 
-- **BREAKING CHANGE** Removed all ability to compile TypeSpec files. You must now point `--lhs` and `--rhs` to Swagger ONLY.
+- **BREAKING CHANGE** TypeSpec compilation support removed.
+  - Dropped flags: `--compile-tsp`, `--lhs-root`, `--rhs-root`, `--typespec-compiler-path`, etc.
+  - Dependencies on `@typespec/*` and `@azure-tools/typespec-*` have been removed.
+  - You must now point `--lhs` and `--rhs` at pre‑built Swagger JSON files or directories only.
 
 ## 0.2.2 (2025-04-14)
 
