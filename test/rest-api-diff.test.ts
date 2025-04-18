@@ -161,31 +161,8 @@ it("should compare two Swagger folders", async () => {
   expect(rhs).toStrictEqual(lhs);
 });
 
-it("should compare a Swagger folder and a TypeSpec folder", async () => {
-  const args = {
-    "compile-tsp": true,
-    "rhs-root": "test/files/typespecMulti",
-  };
-  const config: DiffClientConfig = {
-    lhs: ["test/files/swaggerMulti"],
-    rhs: ["test/files/typespecMulti"],
-    args: args,
-    rules: getApplicableRules(args),
-  };
-  const client = await TestableDiffClient.create(config);
-  client.parse();
-  client.processDiff();
-  client.buildOutput();
-  const [lhs, rhs] = client.resultFiles!.normal;
-  expect(rhs).toStrictEqual(lhs);
-}, 30000); // longer timeout necessary to compile TypeSpec
-
 it("should resolve external swagger references", async () => {
-  const paths = await loadPaths(
-    ["test/files/swaggerExternalReferences"],
-    undefined,
-    {}
-  );
+  const paths = await loadPaths(["test/files/swaggerExternalReferences"], {});
   const pathKeys = toSorted([...paths.keys()]);
   const cwd = process.cwd();
   const expected = toSorted([

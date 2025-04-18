@@ -123,7 +123,7 @@ it("should resolve external references", async () => {
   const filePath = path.normalize(
     `${cwd}/test/files/swaggerExternalReferences/operations.json`
   );
-  const references = toSorted(await extractFileReferences(filePath, undefined));
+  const references = toSorted(await extractFileReferences(filePath));
   const expected = toSorted([
     path.normalize(`${cwd}/test/files/common/common.json`),
     path.normalize(`${cwd}/test/files/swaggerExternalReferences/models.json`),
@@ -139,7 +139,7 @@ it("should resolve external references with relative references", async () => {
   const filePath = path.normalize(
     `${cwd}/test/files/swaggerExternalReferences/externalRelativeReferences.json`
   );
-  const references = toSorted(await extractFileReferences(filePath, undefined));
+  const references = toSorted(await extractFileReferences(filePath));
   const expected = toSorted([
     path.normalize(`${cwd}/test/files/common/common.json`),
     path.normalize(`${cwd}/test/files/common/otherCommon.json`),
@@ -153,7 +153,7 @@ it("should ignore example references", async () => {
   const filePath = path.normalize(
     `${cwd}/test/files/swaggerExternalReferences/operations.json`
   );
-  const references = toSorted(await extractFileReferences(filePath, undefined));
+  const references = toSorted(await extractFileReferences(filePath));
   for (const ref of references) {
     expect(ref.includes("examples")).toBe(false);
   }
