@@ -20,7 +20,8 @@
     "purge": "rimraf .node_modules package-lock.json",
     "test": "vitest",
     "rest-api-diff": "node cmd/rest-api-diff.js",
-    "watch": "tsc -p . --watch"
+    "watch": "tsc -p . --watch",
+    "compare-forks": "node --no-warnings --loader ts-node/esm scripts/compare-forks.ts"
   },
   "bin": {
     "rest-api-diff": "cmd/rest-api-diff.js"
